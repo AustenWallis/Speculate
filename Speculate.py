@@ -491,8 +491,7 @@ for i in tdqm(range(len(emu.grid_points))): # Iterating across the spectral file
 plt.matshow(correlation_matrix)
 plt.title("Correlation coefficient matrix of the emulated spectral grid point \n compared to the real spectral grid point")
 plt.colorbar()
-plt.xlabel('Emulator Grid Points', 'top')
-plt.xla
+plt.xlabel('Emulator Grid Points')
 plt.ylabel('Data Grid Points')
 
 #emu_flux_data = 
