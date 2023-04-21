@@ -1,6 +1,6 @@
 # Speculate
 
-## The spectral emulator built for python, in python...
+## The spectral emulator built for 'python', in python...
 
 Designed for the rapid testing of an observational spectrum to determine the physical properties of the astronomical object. 
 
