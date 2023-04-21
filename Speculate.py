@@ -390,7 +390,7 @@ grid = KWDGridInterface(path='kgrid/sscyg_kgrid090311.210901/', wl_range=wl_rang
 # Faster processing with python's .spec files into a hdf5 file
 keyname = ["param{}{{}}".format(i) for i in model_parameters]   # Auto-generated keyname's from parameters
 keyname = ''.join(keyname)                                      # Keyname required to integrate with Starfish 
-creator = HDF5Creator(grid, 'KWD_Grid_full_ss_cyg.hdf5', key_name=keyname, wl_range=wl_range) # Processing grid function
+creator = HDF5Creator(grid, 'Grid-Emulator_Files/Grid_full.hdf5', key_name=keyname, wl_range=wl_range) # Processing grid function
 creator.process_grid()
 
 # %% 
@@ -401,7 +401,7 @@ n_components = 6           # Alter the number of components in the PCA decomposi
                             # Integer for no. of components or decimal (0.0-1.0) for 0%-100% accuracy. 
 ### ------------------------|
 
-emu = Emulator.from_grid('KWD_Grid_full_ss_cyg.hdf5', n_components=n_components, svd_solver="full") # Emulator grid function
+emu = Emulator.from_grid('Grid-Emulator_Files/Grid_full.hdf5', n_components=n_components, svd_solver="full") # Emulator grid function
 emu.train(options=dict(maxiter=1e5)) # Training the emulator grid, maximum iterations for the scipy.optimise.minimise routine
 emu # Displays the trained emulator's parameters
 
@@ -409,12 +409,12 @@ emu # Displays the trained emulator's parameters
 """4) Plotting and saving the emulator"""
 #plot_eigenspectra(emu, 0) # <---- Yet to implement
 plot_emulator(emu, model_parameters, 1) # <---- Change which parameter is the x-axis, values in section 2
-emu.save('KWD_emu_full_ss_cyg.hdf5')
+emu.save('Grid-Emulator_Files/Emulator_full.hdf5')
 
 # %%
 """5) If you want to see the emulator covariance matrix for a grid point, run this cell"""
 
-emu = Emulator.load("KWD_emu_full_ss_cyg.hdf5")
+emu = Emulator.load("Grid-Emulator_Files/Emulator_full.hdf5")
 random_grid_point = random.choice(emu.grid_points)
 print("Random Grid Point Selection")
 print(list(emu.param_names))
@@ -448,7 +448,7 @@ for i in tqdm(range(len(emu.grid_points))): # Iterating across the spectral file
     obs_data = Spectrum(waves, obs_flux_data, sigmas=sigmas, masks=None)
     for j in range(len(emu.grid_points)): #Iterating across the emulated files
         model = SpectrumModel(
-            'KWD_emu_full_ss_cyg.hdf5',
+            'Grid-Emulator_Files/Emulator_full.hdf5',
             obs_data,
             grid_params=list(emu.grid_points[j]), #[list, of , grid , points]
             Av=0,
@@ -458,34 +458,7 @@ for i in tqdm(range(len(emu.grid_points))): # Iterating across the spectral file
         a = np.corrcoef(obs_flux_data, model_flux)
         correlation_matrix[i][j] = a[0][1]
 
-"""
-correlation_matrix = np.empty((len(emu.grid_points), len(emu.grid_points)))
-for i in tdqm(range(len(emu.grid_points))): # Iterating across the spectral file grid points(changing file names)
-    spectrum_file = grid.get_flux(emu.grid_points[i])
-    waves, obs_flux_data = np.loadtxt(spectrum_file, usecols=(1, 8), unpack = True)
-    wl_range_data = (wl_range[0]+50, wl_range[1]-50)
-    waves = np.flip(waves)
-    obs_flux_data = np.flip(obs_flux_data)
-    obs_flux_data = gaussian_filter1d(obs_flux_data, 50)
-    obs_flux_data = [np.log10(i) for i in obs_flux_data] #log
-    obs_flux_data = np.array(obs_flux_data) #log
-    indexes = np.where((waves >= wl_range_data[0]) & (waves <= wl_range_data[1]))
-    waves = waves[indexes[0]]
-    obs_flux_data = obs_flux_data[indexes[0]]
-    sigmas = np.zeros(len(waves))
-    obs_data = Spectrum(waves, obs_flux_data, sigmas=sigmas, masks=None)
-    for j in range(len(emu.grid_points)): #Iterating across the emulated files
-        model = SpectrumModel(
-            'KWD_emu_full_ss_cyg.hdf5',
-            obs_data,
-            grid_params=list(emu.grid_points[j]), #[list, of , grid , points]
-            Av=0,
-            global_cov=dict(log_amp=-8, log_ls=5)
-            )
-        model_flux, model_cov = model()
-        a = np.corrcoef(obs_flux_data, model_flux)
-        correlation_matrix[i][j] = a[0][1]   
-"""     
+   
 # %%
 """5.75 Plotting the correlation coefficient matrix"""        
 plt.matshow(correlation_matrix)
@@ -493,16 +466,6 @@ plt.title("Correlation coefficient matrix of the emulated spectral grid point \n
 plt.colorbar()
 plt.xlabel('Emulator Grid Points')
 plt.ylabel('Data Grid Points')
-
-#emu_flux_data = 
-# Normalistation of the data entering the PCA
-#obs_norm_factors = obs_flux_data.mean(1)
-#obs_flux_data /= obs_norm_factors[:, np.newaxis]
-#obs_flux_mean = obs_flux_data.mean(0)
-#obs_flux_data -= obs_flux_mean
-#obs_flux_std = obs_flux_data.std(0)
-#obs_flux_data /= obs_flux_std
-
 
 # %% 
 """6) Producing test spectrum data for the emulator comparisons."""
@@ -555,8 +518,7 @@ if data_three == 1:
 if data_four == 1:
     waves, fluxes = np.loadtxt(f'kgrid/{file}', unpack = True, usecols=(1,10), skiprows=74)
 
-
-
+# Data manipulation/truncation into correct format.
 wl_range_data = (wl_range[0]+50, wl_range[1]-50)
 waves = np.flip(waves)
 fluxes = np.flip(fluxes)
@@ -658,7 +620,7 @@ plt.show()
 # To implement
 # %% 
 """8.2 Search grid point indexes for Stage 9"""
-search_grid_points = 1 # Make sure to set to 0 if running a remote session!!!
+search_grid_points = 0 # Make sure to set to 0 if running a remote session!!!
 if search_grid_points == 1:
     print("Search different indexes to find the associated grid point values")
     print("Index range is from 0 to {}".format(len(emu.grid_points)-1))
@@ -686,7 +648,7 @@ log_ls = 5                  # Natural logarithm of the global covariance's Mater
 ### ------------------------|
 
 model = SpectrumModel(
-    'KWD_emu_full_ss_cyg.hdf5',
+    'Grid-Emulator_Files/Emulator_full.hdf5',
     data,
     grid_params=list(emu.grid_points[89]), #[list, of , grid , points]
     Av=0,
@@ -736,11 +698,11 @@ model
 # %%
 """12 Saving and plotting the trained model"""
 model.plot(yscale="linear")
-model.save("KWD_Grid_full_ss_cyg_MAP_example.toml")
+model.save("Grid-Emulator_Files/Grid_full_MAP.toml")
 
 # %%
 """12.5 Reloading the trained model"""
-model.load("KWD_Grid_full_ss_cyg_MAP_example.toml")
+model.load("Grid-Emulator_Files/Grid_full_MAP.toml")
 model.freeze("global_cov")
 model.labels
 #%%
@@ -793,7 +755,7 @@ def log_prob(P, priors):
     model.set_param_vector(P)
     return model.log_likelihood(priors)
 
-backend = emcee.backends.HDFBackend("KWD_Grid_full_ss_cyg_chain_example.hdf5")
+backend = emcee.backends.HDFBackend("Grid-Emulator_Files/Grid_full_MCMC_chain.hdf5")
 backend.reset(nwalkers, ndim)
 
 with Pool(ncpu) as pool:
@@ -837,7 +799,7 @@ sampler.run_mcmc(backend.get_last_sample(), extra_steps, progress=True)
 
 # %%
 """16 Showing raw MCMC chain."""
-reader = emcee.backends.HDFBackend("KWD_Grid_full_ss_cyg_chain_example.hdf5")
+reader = emcee.backends.HDFBackend("Grid-Emulator_Files/Grid_full_MCMC_chain.hdf5")
 full_data = az.from_emcee(reader, var_names=model.labels)
 flatchain = reader.get_chain(flat=True)
 print(flatchain)
@@ -890,6 +852,6 @@ ee = dict(zip(model.labels, ee))
 model.set_param_dict(ee)
 model
 model.plot();
-model.save("KWD_Grid_full_ss_cyg_sampled_example.toml")
+model.save("Grid-Emulator_Files/Grid_full_parameters_sampled.toml")
 
 # %%
