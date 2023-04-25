@@ -3,35 +3,26 @@
 
 # Importing modules and custom functions
 
+import os
+import random
+import emcee
+import corner
 import numpy as np
-import Starfish
-from Starfish.grid_tools import PHOENIXGridInterfaceNoAlpha
-from Starfish.grid_tools import download_PHOENIX_models
-from Starfish.grid_tools.instruments import SPEX
+import math as m
+import matplotlib.pyplot as plt
+import arviz as az
+import scipy.stats as st
+from scipy.ndimage import gaussian_filter1d
 from Starfish.grid_tools import HDF5Creator
+from Starfish.grid_tools import GridInterface
 from Starfish.emulator import Emulator
 from Starfish.emulator.plotting import plot_emulator
 from Starfish.emulator.plotting import plot_eigenspectra
-import matplotlib.pyplot as plt
 from Starfish.spectrum import Spectrum
 from Starfish.models import SpectrumModel
-import scipy.stats as st
-import emcee
-import arviz as az
-import corner
-import time
-import matplotlib
-import itertools
-from tqdm import tqdm
-import random
-import math as m
-#Surya
-import h5py
-import os
-from Starfish.grid_tools import GridInterface
-from scipy.ndimage import gaussian_filter1d
 from multiprocessing import Pool
 from multiprocessing import cpu_count
+from tqdm import tqdm
 
 class KWDGridInterface(GridInterface):
     """"
@@ -54,7 +45,7 @@ class KWDGridInterface(GridInterface):
     
     """
     
-    def __init__(self, path, air=False, wl_range=(1200,1800), model_parameters=(1,2,3)):
+    def __init__(self, path, air=False, wl_range=(1200,1800), model_parameters=(1,2,3), scaled='linear'):
         """"
         Initialises an empty grid with parameters and wavelengths.
         
@@ -182,7 +173,7 @@ class KWDGridInterface(GridInterface):
             parameters_used["param{}".format(i)] = dictionary[i]
         return parameters_used
         
-    def load_flux(self, parameters, header=False, norm=False, angle_inc=0):
+    def load_flux(self, parameters, header=False, norm=False, angle_inc=0, scale='linear'):
         """"
         Returns the Flux of a given set of parameters.
         
@@ -200,7 +191,11 @@ class KWDGridInterface(GridInterface):
         angle_inc : int
             Angle of inclination, takes values between 0 to 6 corresponding
             to values between 40.0 and 70.0 with 5.0 degree increment.
-            
+        
+        scale : str
+            Change this default too if changing the flux scale. 
+            Define the scale for your data and emulator grid space. 'linear', 'log' or 'scaled'
+                
         Returns
         -------
         ndarray
@@ -214,7 +209,10 @@ class KWDGridInterface(GridInterface):
         flux = np.loadtxt(self.get_flux(parameters), usecols=(8+angle_inc), skiprows=2)
         flux = np.flip(flux)
         flux = gaussian_filter1d(flux, 50)
-        flux = np.log10(flux) #log
+        if scale == 'log':
+            flux = np.log10(flux) # logged 10 
+        if scale == 'scaled': # to values near order of magnitude 10^0. 
+            flux = flux/np.mean(flux)
         
         hdr = {'c0' : angle_inc} # Header constructed (channel 0 corresponds to angle of inclination)
         for i in range(len(self.param_names)):
@@ -380,8 +378,9 @@ def newlagtimes(x,y,maxlags):
 """
     
 ### ----- Inputs here ------|
-model_parameters=(1,2,5)  # Parameters shown above
+model_parameters=(1,2,5)    # Parameters shown above
 wl_range = (900,1800)       # Wavelength range of your emulator grid space kgrid:(min, max)=(876,1824)
+scale = 'linear'            # Transforming data. 'linear', 'log' or 'scaled' NOT WORKING PROPERLY, CHANGE too IN def load_flux ^
 ### ------------------------|
 
 model_parameters = sorted(model_parameters) # Sorting parameters by increasing order
@@ -403,10 +402,11 @@ n_components = 6           # Alter the number of components in the PCA decomposi
 
 emu = Emulator.from_grid('Grid-Emulator_Files/Grid_full.hdf5', n_components=n_components, svd_solver="full") # Emulator grid function
 emu.train(options=dict(maxiter=1e5)) # Training the emulator grid, maximum iterations for the scipy.optimise.minimise routine
-emu # Displays the trained emulator's parameters
+print(emu) # Displays the trained emulator's parameters
 
 # %%
 """4) Plotting and saving the emulator"""
+
 #plot_eigenspectra(emu, 0) # <---- Yet to implement
 plot_emulator(emu, model_parameters, 1) # <---- Change which parameter is the x-axis, values in section 2
 emu.save('Grid-Emulator_Files/Emulator_full.hdf5')
@@ -418,8 +418,9 @@ emu = Emulator.load("Grid-Emulator_Files/Emulator_full.hdf5")
 random_grid_point = random.choice(emu.grid_points)
 print("Random Grid Point Selection")
 print(list(emu.param_names))
+print(emu.grid_points[0])
 print(random_grid_point)
-weights, cov = emu(random_grid_point)
+weights, cov = emu(emu.grid_points[0]) #random_grid_point
 X = emu.eigenspectra * (emu.flux_std)
 flux = (weights @ X) + emu.flux_mean
 emu_cov = X.T @ cov @ X
@@ -427,40 +428,45 @@ plt.matshow(emu_cov, cmap='Reds')
 plt.title("Emulator Covariance Matrix")
 plt.colorbar()
 plt.show()
+plt.plot(emu.wl, flux)
 
 # %% 
-"""5.5) Emulator's correlation matrix with grid points data, debugging training convergence issues"""
+"""5.2) Emulator's correlation matrix with grid points data, debugging training convergence issues"""
 
-correlation_matrix = np.empty((len(emu.grid_points), len(emu.grid_points)))
-for i in tqdm(range(len(emu.grid_points))): # Iterating across the spectral file grid points(changing file names)
+# Likely can be optimised to run quicker some future date. 
+correlation_matrix = np.empty((len(emu.grid_points), len(emu.grid_points))) # empty matrix of grid dimensions
+for i in tqdm(range(len(emu.grid_points))): # Iterating across the spectral file grid points (changing file names) (y-axis)
+    # Loading and data manipulation performed on the grid files
     spectrum_file = grid.get_flux(emu.grid_points[i])
     waves, obs_flux_data = np.loadtxt(spectrum_file, usecols=(1, 8), unpack = True)
     wl_range_data = (wl_range[0]+50, wl_range[1]-50)
     waves = np.flip(waves)
     obs_flux_data = np.flip(obs_flux_data)
     obs_flux_data = gaussian_filter1d(obs_flux_data, 50)
-    obs_flux_data = [np.log10(i) for i in obs_flux_data] #log
-    obs_flux_data = np.array(obs_flux_data) #log
+    if scale == 'log':
+        obs_flux_data = [np.log10(i) for i in obs_flux_data] # logged scale
+        obs_flux_data = np.array(obs_flux_data) 
+    if scale == 'scaled':
+        obs_flux_data /= np.mean(obs_flux_data)
     indexes = np.where((waves >= wl_range_data[0]) & (waves <= wl_range_data[1]))
     waves = waves[indexes[0]]
     obs_flux_data = obs_flux_data[indexes[0]]
     sigmas = np.zeros(len(waves))
     obs_data = Spectrum(waves, obs_flux_data, sigmas=sigmas, masks=None)
-    for j in range(len(emu.grid_points)): #Iterating across the emulated files
+    # Loading and data manipulation performed on the emulation files utilising starfish module. 
+    for j in range(len(emu.grid_points)): # Iterating across the emulated files (x-axis)
         model = SpectrumModel(
             'Grid-Emulator_Files/Emulator_full.hdf5',
             obs_data,
-            grid_params=list(emu.grid_points[j]), #[list, of , grid , points]
+            grid_params=list(emu.grid_points[j]), # [list, of , grid , points]
             Av=0,
-            global_cov=dict(log_amp=-8, log_ls=5)
+            global_cov=dict(log_amp=-20, log_ls=5) # Numbers irrelevant
             )
         model_flux = model.flux_non_normalised()
         a = np.corrcoef(obs_flux_data, model_flux)
         correlation_matrix[i][j] = a[0][1]
 
-   
-# %%
-"""5.75 Plotting the correlation coefficient matrix"""        
+#Plotting the correlation coefficient matrix       
 plt.matshow(correlation_matrix)
 plt.title("Correlation coefficient matrix of the emulated spectral grid point \n compared to the real spectral grid point")
 plt.colorbar()
@@ -523,8 +529,11 @@ wl_range_data = (wl_range[0]+50, wl_range[1]-50)
 waves = np.flip(waves)
 fluxes = np.flip(fluxes)
 fluxes = gaussian_filter1d(fluxes, 50)
-fluxes = [np.log10(i) for i in fluxes] #log
-fluxes = np.array(fluxes) #log
+if scale == 'log':
+    fluxes = [np.log10(i) for i in fluxes] #log
+    fluxes = np.array(fluxes) #log
+if scale == 'scaled':
+    fluxes /= np.mean(fluxes)
 indexes = np.where((waves >= wl_range_data[0]) & (waves <= wl_range_data[1]))
 waves = waves[indexes[0]]
 fluxes = fluxes[indexes[0]]
@@ -582,13 +591,19 @@ plt.plot(waves, fit_err_plus, color='orange', label=f'Quadratic fit + {percent}$
 plt.plot(waves, fit_err_minus, color='orange', label=f'Quadratic fit - {percent}$\sigma$', linewidth=0.5)
 plt.plot(waves, fit, color='purple', label='Quadratic fit', linewidth=0.5)
 plt.plot(waves, smooth_flux, color='green', label='Smoothened/High Pass Filter')
+if scale == 'linear' or scale == 'scaled':
+    plt.plot(waves, adj_flux, color='blue', label='Flux Filter Adjusted', linewidth=0.5)
 plt.xlabel('$\lambda [\AA]$')
 plt.ylabel('$f_\lambda$ [$erg/cm^2/s/cm$]')
 plt.title('Showing Adjusted Starfish Flux From Being Passed Through \n A High-pass Filter And Quadratic Fit Boundaries To Remove Lines')
 plt.legend()
 plt.show()
-plt.plot(waves, adj_flux, color='blue', label='Flux Filter Adjusted', linewidth=0.5) #log
-plt.show()
+if scale == 'log':
+    plt.plot(waves, adj_flux, color='blue', label='Flux Filter Adjusted', linewidth=0.5)
+    plt.xlabel('$\lambda [\AA]$')
+    plt.ylabel('$f_\lambda$ [$erg/cm^2/s/cm$]')
+    plt.legend()
+    plt.show()
 
 pixels1, autocorrelation = newlagtimes(adj_flux, adj_flux, lags) # Austen's custom Autocorrelation function. 
 plt.plot(pixels1, autocorrelation, label="Using Austen's ACF", linewidth=0.5)
@@ -643,18 +658,18 @@ if search_grid_points == 1:
 """9 Assigning the model and initial model plot"""
 
 ### ----- Inputs here ------|
-log_amp = -8               # Natural logarithm of the global covariance's Matern 3/2 kernel amplitude log=-52
+log_amp = -8                # Natural logarithm of the global covariance's Matern 3/2 kernel amplitude log=-52 'linear', log=-8 'log'
 log_ls = 5                  # Natural logarithm of the global covariance's Matern 3/2 kernel lengthscale
 ### ------------------------|
 
 model = SpectrumModel(
     'Grid-Emulator_Files/Emulator_full.hdf5',
     data,
-    grid_params=list(emu.grid_points[89]), #[list, of , grid , points]
+    grid_params=list(emu.grid_points[10]), #[list, of , grid , points]
     Av=0,
     global_cov=dict(log_amp=log_amp, log_ls=log_ls)
 )
-model
+print(model)
 model.plot(yscale="linear")
 model_flux, model_cov = model()
 plt.matshow(model._glob_cov, cmap='Greens')
@@ -667,7 +682,7 @@ plt.colorbar()
 plt.show()
 model.freeze("Av")
 print("-- Model Labels --")
-model.labels
+print(model.labels)
 
 # %% 
 """10 Assigning the priors"""
@@ -694,7 +709,7 @@ for label in model.labels:
 # %%
 """11 Training the model"""
 model.train(priors)
-model
+print(model)
 # %%
 """12 Saving and plotting the trained model"""
 model.plot(yscale="linear")
@@ -704,7 +719,7 @@ model.save("Grid-Emulator_Files/Grid_full_MAP.toml")
 """12.5 Reloading the trained model"""
 model.load("Grid-Emulator_Files/Grid_full_MAP.toml")
 model.freeze("global_cov")
-model.labels
+print(model.labels)
 #%%
 #model_ball_initial = {"c1": model["c1"], "c2": model["c2"], "c3": model["c3"]}
 
@@ -715,11 +730,11 @@ os.environ["OMP_NUM_THREADS"] = "1"
 import multiprocessing as mp
 mp.set_start_method('fork', force=True)
 
-
 ### ----- Inputs here ------|
 ncpu = cpu_count() - 2      # Pool CPU's used. 
 nwalkers = 3 * ncpu         # Number of walkers in the MCMC.
-max_n = 1000                # Maximum iterations of the MCMC if convergence is not reached. 
+max_n = 1000                # Maximum iterations of the MCMC if convergence is not reached.
+extra_steps = int(max_n/10) # Extra MCMC steps 
 ### ------------------------|
 
 ndim = len(model.labels)
@@ -751,6 +766,8 @@ for i, key in enumerate(model.labels):
     else:
         model.set_param_vector(P)
         return model.log_likelihood(priors)"""
+
+
 def log_prob(P, priors):
     model.set_param_vector(P)
     return model.log_likelihood(priors)
@@ -789,20 +806,14 @@ with Pool(ncpu) as pool:
             print(f"Converged at sample {sampler.iteration}")
             break
         old_tau = tau
-
-# %% 
-"""15 Running extra mcmc steps post-convergence to check clean chains."""
-### --- Inputs here ----|
-extra_steps = max_n/10  # Extra MCMC steps
-### --------------------|
-sampler.run_mcmc(backend.get_last_sample(), extra_steps, progress=True)
+        
+    sampler.run_mcmc(backend.get_last_sample(), extra_steps, progress=True)
 
 # %%
 """16 Showing raw MCMC chain."""
 reader = emcee.backends.HDFBackend("Grid-Emulator_Files/Grid_full_MCMC_chain.hdf5")
 full_data = az.from_emcee(reader, var_names=model.labels)
 flatchain = reader.get_chain(flat=True)
-print(flatchain)
 az.plot_trace(full_data)
 
 # %%
@@ -818,7 +829,6 @@ else:
 burn_samples = reader.get_chain(discard=burnin, thin=thin)
 log_prob_samples = reader.get_log_prob(discard=burnin, thin=thin)
 log_prior_samples = reader.get_blobs(discard=burnin, thin=thin)
-
 dd = dict(zip(model.labels, burn_samples.T))
 burn_data = az.from_dict(dd)
 
@@ -848,10 +858,9 @@ corner.corner(
    plot and save our final best fit model spectrum."""
 ee = [np.mean(burn_samples.T[i]) for i in range(len(burn_samples.T))]
 ee = dict(zip(model.labels, ee))
-#best_fit = dict(az.summary(burn_data, round_to=None)["mean"])
 model.set_param_dict(ee)
-model
-model.plot();
+print(model)
+model.plot(yscale="linear");
 model.save("Grid-Emulator_Files/Grid_full_parameters_sampled.toml")
 
 # %%

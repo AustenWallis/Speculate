@@ -19,6 +19,14 @@ More information to be added later. Have a look at the cookbook notebook for des
 - Find ways manipulating the data to reduce correlations between alternative grid points. (Hopefully solve uniform chains and cornerplots.) Check with starfish demo too. 
 - Interpolated data in stage 6 switch 3, check noisy data switch 2 to smoothen or not.
 - Check gaussian ball inital starting points to be tight.
-- Log/scale/linear(unchanged) switch to change the domains the observations and emulator work in. Which is best for the data. 
+~ Log/scale/linear(unchanged) switch to change the domains the observations and emulator work in. Which is best for the data. 
 - Log_amp/Log_ls global kernel calculators for estimate for stage 9. 
 - Log-probability limits for the variable parameters. 
+
+#### 25.04.2023 Updates
+
+Correlation grid points matrix debugging.
+MCMC completing. 
+Updated cookbook.
+Custom Starfish folder for install required (read cookbook install instructions)
+Scaling switch semi-implemented for log/scale/linear. Very small effects in outcomes. 'Log' faster but less sensitive. 
