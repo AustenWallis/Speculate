@@ -9,8 +9,9 @@ plt.style.use("seaborn")
 
 def plot_reconstructed(emulator, grid, folder):
     """
+    Looks to be depreciated !!
     Plot the reconstructed spectra and residual at each grid point.
-
+    
     Parameters
     ----------
     emulator : :class:`Emulaor`
@@ -25,12 +26,12 @@ def plot_reconstructed(emulator, grid, folder):
     """
     recon_fluxes = []
     recon_err = []
-    for params in grid.grid_points:
-        flux, var = emulator.load_flux(params, full_cov=False)
+    for params in emulator.grid_points:
+        flux, var = emulator.load_flux(params)
         recon_fluxes.append(flux)
         recon_err.append(np.sqrt(var))
     fluxes = np.array(list(grid.fluxes))
-    data = zip(grid.grid_points, fluxes, recon_fluxes, recon_err)
+    data = zip(emulator.grid_points, fluxes, recon_fluxes, recon_err)
 
     plotdir = os.path.expandvars(folder)
     if not os.path.exists(plotdir):

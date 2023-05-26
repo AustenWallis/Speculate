@@ -1,0 +1,446 @@
+import os
+import fnmatch
+import numpy as np
+import matplotlib.pyplot as plt
+from Starfish.grid_tools import GridInterface
+
+class KWDGridInterface(GridInterface):
+    """
+    An Interface to the KWD grid produced by PYTHON simulation.
+    
+    The wavelengths in the spectra are in Angstrom and fluxes in erg/s/cm^2/cm
+    
+    Parameters of model
+    -------------------
+    1) wind.mdot (msol/yr)
+    2) kn.d
+    3) kn.mdot_r_exponent
+    4) kn.v_infinity (in_units_of_vescape)
+    5) kn.acceleration_length (cm)
+    6) kn.acceleration_exponent
+    
+    Optional parameters
+    -------------------
+    angle of inclination (taken to be 40.0 for this analysis)
+    
+    """
+    
+    def __init__(self, path, air=False, wl_range=(1200,1800), model_parameters=(1,2,3), scaled='linear'):
+        """
+        Initialises an empty grid with parameters and wavelengths.
+        
+        Parameters
+        ----------
+        path : str or path-like
+            The path of the base of the KWD library.
+        air : bool, optional
+            Whether the wavelengths are measured in air or not. Default is False
+            (Required due to implementation of inherited GridInterface class)
+        wl_range : tuple, optional
+            The (min, max) of the wavelengths in AA. Default is (1200, 1400) for testing.
+        model_parameters : tuple, optional
+            Specifiy the parameters you wish to fit by adding intergers to the tuple. 
+        """
+        # The grid points in the parameter space are defined, 
+        # param_points_1-6 correspond to the model parameters defined at the top in the respective order.
+        
+        self.model_parameters = model_parameters
+        points = []
+        if 1 in model_parameters:
+            param_points_1 = np.array([1e-10, 1.5e-10, 2.1e-10, 3.1e-10, 4.5e-10, 6.6e-10, 9.7e-10, 1.4e-09, 2.1e-09, 3e-09])
+            points.append(param_points_1)
+        if 2 in model_parameters:
+            param_points_2 = np.array([4, 16, 32])
+            points.append(param_points_2)
+        if 3 in model_parameters:
+            param_points_3 = np.array([0, 0.5, 1])
+            points.append(param_points_3)
+        if 4 in model_parameters:
+            param_points_4 = np.array([1, 2, 3])
+            points.append(param_points_4)
+        if 5 in model_parameters:
+            param_points_5 = np.array([1e+10, 3e+10, 7e+10])
+            points.append(param_points_5)
+        if 6 in model_parameters:
+            param_points_6 = np.array([1, 3, 6])
+            points.append(param_points_6)
+            
+        param_names = ["param{}".format(number) for number in model_parameters] # formatting the parameter names
+
+        # Inititalising the GridInterface with the KWD parameters.
+        super().__init__(
+            name='KWD',
+            param_names=param_names,
+            points=points,
+            wave_units='AA',
+            flux_units='erg/s/cm^2/cm',
+            air=air,
+            wl_range=wl_range,
+            path=path,
+        )
+        
+        # The wavelengths for which the fluxes are measured are retrieved.
+        try:
+            wls_fname = os.path.join(self.path, 'sscyg_k2_000000000000.spec')
+            wls = np.loadtxt(wls_fname, delimiter=' ', usecols=(1), skiprows=2)
+            wls = np.flip(wls)
+        except:
+            raise ValueError("Wavelength file improperly specified")
+        
+        # Truncating to the wavelength range to the provided values.
+        self.wl_full = np.array(wls, dtype=np.float64) #wls[::-1]
+        self.ind = (self.wl_full >= self.wl_range[0]) & (
+            self.wl_full <= self.wl_range[1])
+        self.wl = self.wl_full[self.ind] 
+        
+    def get_flux(self, params):
+        """
+        Constructs path of datafile corresponding to parameters passed.
+        
+        Parameters
+        ----------
+        params : ndarray
+            Contains the parameters of a required grid point.
+            
+        Returns
+        -------
+        str
+            The path of the datafile corresponding to the input parameters.
+            
+        """
+        #param_names = ["c{}".format(number) for number in parameter_numbers]
+        # dict file name format for different param values.
+        param1_name = {1e-10: '00', 1.5e-10: '01', 2.1e-10: '02', 3.1e-10: '03', 4.5e-10: '04',
+                       6.6e-10: '05', 9.7e-10: '06', 1.4e-09: '07', 2.1e-09: '08', 3e-09: '09'}
+        param2_name = {4: '00', 16: '01', 32: '02'}
+        param3_name = {0: '00', 0.5: '01', 1: '02'}
+        param4_name = {1: '00', 2: '01', 3: '02'}
+        param5_name = {1e+10: '00', 3e+10: '01', 7e+10: '02'}
+        param6_name = {1: '00', 3: '01', 6: '02'}
+        all_names = [param1_name, param2_name, param3_name, param4_name, param5_name, param6_name] # Can be improved with dictionary
+        param_numbers = params
+        base = self.path + 'sscyg_k2_'
+        for loop in range(len(all_names)):
+            if "param{}".format(loop+1) in self.param_names:
+                base += all_names[loop][param_numbers[loop]]
+            else:
+                base += '00'
+                param_numbers = np.insert(param_numbers, loop, 0)          
+        return base + '.spec'
+
+    def parameters_description(self, model_parameters):
+        """
+        Provides a description of the model parameters used.
+
+        Args:
+            model_parameters (tuple): Numbers of the parameters used in the model.
+
+        Returns:
+            dictionary: Description of the 'paramX' name
+        """
+        dictionary = {
+            1:"wind.mdot (msol/yr)",
+            2:"kn.d",
+            3:"kn.mdot_r_exponent",
+            4:"kn.v_infinity (in_units_of_vescape)",
+            5:"kn.acceleration_length (cm)",
+            6:"n.acceleration_exponent"
+            } #Description of the paramters
+        parameters_used = {}
+        for i in model_parameters:
+            parameters_used["param{}".format(i)] = dictionary[i]
+        return parameters_used
+        
+    def load_flux(self, parameters, header=False, norm=False, angle_inc=0, scale='linear'):
+        """
+        Returns the Flux of a given set of parameters.
+        
+        Parameters
+        ----------
+        parameters : ndarray
+            Contains parameters of a required grid point
+            
+        header : bool
+            Whether to attach param values on return
+            
+        norm : bool
+            Whether to normalise the return flux (left unimplemented)
+            
+        angle_inc : int
+            Angle of inclination, takes values between 0 to 6 corresponding
+            to values between 40.0 and 70.0 with 5.0 degree increment.
+        
+        scale : str
+            Change this default too if changing the flux scale. 
+            Define the scale for your data and emulator grid space. 'linear', 'log' or 'scaled'
+                
+        Returns
+        -------
+        ndarray
+            List of fluxes in the wavelength range specified on initialisation
+            
+        dict (Optional)
+            Dictionary of parameter names and values
+        
+        """
+        from scipy.ndimage import gaussian_filter1d # Instead of normalising, a 1d gaussian smoothing filter is applied 
+        flux = np.loadtxt(self.get_flux(parameters), usecols=(8+angle_inc), skiprows=2)
+        flux = np.flip(flux)
+        #flux = gaussian_filter1d(flux, 50)
+        if scale == 'log':
+            flux = np.log10(flux) # logged 10 
+        if scale == 'scaled': # to values near order of magnitude 10^0. 
+            flux = flux/np.mean(flux)
+        
+        hdr = {'c0' : angle_inc} # Header constructed (channel 0 corresponds to angle of inclination)
+        for i in range(len(self.param_names)):
+            hdr[self.param_names[i]] = parameters[i]
+
+        if(header):
+            return flux[self.ind], hdr
+        else:
+            return flux[self.ind]
+        
+class ShortSpecGridInterface(GridInterface):
+    """
+    An Interface to the short spec grid produced by PYTHON v87a Radiative transfer simulations.
+    
+    The wavelengths in the spectra are in Angstrom and fluxes in erg/s/cm^2/cm
+    
+    Parameters of model
+    -------------------
+    1) wind.mdot (msol/yr)
+    2) KWD.d
+    3) kn.v_infinity (in_units_of_vescape)
+    
+    Optional parameters
+    -------------------
+    Angle of Inclination - Amend value in function 'def load_flux' default's value
+    
+    """
+    
+    def __init__(self, path, air=False, wl_range=(850,1850), model_parameters=(1,2,3), scaled='linear'):
+        """
+        Initialises an empty grid with parameters and wavelengths.
+        
+        Args:
+            path (str or path-like): The path of the base of the grid space library.
+            
+            air (bool, optional): Whether the wavelengths are measured in air or not.
+                Default is False. (Required due to implementation of inherited GridInterface class)
+                
+            wl_range (tuple, optional): The (min, max) of the wavelengths in AA. 
+                Default is (850, 1850), wavelength range.
+            
+            model_parameters (tuple, optional): Specifiy the parameters 
+                you wish to fit by adding intergers to the tuple. 
+        """
+        
+        # The grid points in the parameter space are defined, 
+        # param_points_1-3 correspond to the model parameters defined at the top in the respective order.
+        self.model_parameters = model_parameters
+        points = []
+        if 1 in model_parameters: # wind.mdot (msol/yr)
+            param_points_1 = np.array([4e-11, 1e-10, 4e-10, 1e-09, 3e-09])
+            points.append(param_points_1)
+        if 2 in model_parameters: # KWD.d
+            param_points_2 = np.array([2, 5, 8, 12, 16])
+            points.append(param_points_2)
+        if 3 in model_parameters: # KWD.v_infinity (in_units_of_vescape)
+            param_points_3 = np.array([1, 1.5, 2, 2.5, 3])
+            points.append(param_points_3)
+            
+        param_names = ["param{}".format(number) for number in model_parameters] # formatting the parameter names
+
+        # Inititalising the GridInterface with the KWD parameters.
+        super().__init__(
+            name='KWD',
+            param_names=param_names,
+            points=points,
+            wave_units='AA',
+            flux_units='erg/s/cm^2/cm',
+            air=air,
+            wl_range=wl_range,
+            path=path,
+        )
+    
+        # The wavelengths for which the fluxes are measured are retrieved.
+        try:
+            wls_fname = os.path.join(self.path, 'run01_WMdot4e-11_d2_vinf1.spec')
+            wls = np.loadtxt(wls_fname, usecols=(1), skiprows=81, unpack=True)
+            wls = np.flip(wls)
+        except:
+            raise ValueError("Wavelength file improperly specified")
+        
+        # Truncating to the wavelength range to the provided values.
+        self.wl_full = np.array(wls, dtype=np.float64) #wls[::-1]
+        self.ind = (self.wl_full >= self.wl_range[0]) & (
+            self.wl_full <= self.wl_range[1])
+        self.wl = self.wl_full[self.ind]
+        
+        
+    def get_flux(self, params):
+        """
+        Constructs path to datafile corresponding to model parameters passed.
+        
+        Args:
+            params (ndarray): Contains the modelling parameters of a required grid point.
+            
+        Returns:
+            str: The path of the datafile corresponding to the input model parameters.
+        """
+        
+        # param_names = ["c{}".format(number) for number in parameter_numbers]
+        param1_name = [4e-11, 1e-10, 4e-10, 1e-09, 3e-09] # WMdot
+        param2_name = [2, 5, 8, 12, 16] # KWD.d
+        param3_name = [1, 1.5, 2, 2.5, 3] # KWD.v_infinity
+        all_names = [param1_name, param2_name, param3_name]
+        
+        # Fixed values to select runs if 2D grid made, change index if wishing for different fixed other param
+        fixed_params = [param1_name[2], param2_name[2], param3_name[2]]
+        
+        for loop in range(len(all_names)):
+            if "param{}".format(loop+1) not in self.param_names: # Checking for missing model parameter
+                params = np.insert(params, loop, fixed_params[loop]) # Adding fixed default for missing parameter
+        file_runs = os.listdir('short_spec_cv_grid/') # Finding all possible run file names
+        if params[2]%1 == 0.5: # eg param 3 replacing 1.5 to 1p5 as per the file names.
+            file_name = f'*_WMdot{params[0]}_d{int(params[1])}_vinf{str(params[2]).replace(".","p")}.spec'     
+        else:
+            file_name = f'*_WMdot{params[0]}_d{int(params[1])}_vinf{int(params[2])}.spec'
+        for file in fnmatch.filter(file_runs, file_name): # Matching parameters to the file name
+            file_match = file
+        return self.path + file_match # returning the correct filename/path for the parameter fluxes
+
+    def parameters_description(self, model_parameters):
+        """Provides a description of the model parameters used. Simply input the 
+        model_parameter's corresponding integers as a tuple.
+
+        Args:
+            model_parameters (tuple): Numbers of the parameters used in the model.
+
+        Returns:
+            dictionary: Description of the 'paramX' name
+        """
+        dictionary = {
+            1:"wind.mdot (msol/yr)",
+            2:"KWD.d",
+            3:"KWD.v_infinity (in_units_of_vescape)",
+            } # Description of the paramters
+        parameters_used = {}
+        for i in model_parameters:
+            parameters_used["param{}".format(i)] = dictionary[i]
+        return parameters_used
+        
+    def load_flux(self, parameters, header=False, norm=False, angle_inc=6, scale='linear'):
+        """
+        Returns the Flux of a given set of parameters.
+        
+        Args:
+            parameters (ndarray): Contains parameters of a required grid point
+            
+            header (bool): Whether to attach param values on return
+            
+            norm (bool): Whether to normalise the return flux (left unimplemented)
+            
+            angle_inc (int): Angle of inclination, takes values between 0 to 11 corresponding
+                to values between 30.0 and 85.0 with 5.0 degree increment.
+        
+            scale (str): Change this default too if changing the flux scale. 
+                Define the scale for your data and emulator grid space. 'linear', 'log' or 'scaled'
+                
+        Returns:
+            ndarray: List of fluxes in the wavelength range specified on initialisation
+            
+            dict (Optional): Dictionary of parameter names and values
+        """
+        
+        from scipy.ndimage import gaussian_filter1d # Instead of normalising, a 1d gaussian smoothing filter is applied 
+        flux = np.loadtxt(self.get_flux(parameters), usecols=(10+angle_inc), skiprows=81)
+        flux = np.flip(flux)
+        #flux = gaussian_filter1d(flux, 50)
+        if scale == 'log':
+            flux = np.log10(flux) # logged 10 
+        if scale == 'scaled': # to values near order of magnitude 10^0. 
+            flux = flux/np.mean(flux)
+        
+        hdr = {'c0' : angle_inc} # Header constructed (channel 0 corresponds to angle of inclination)
+        for i in range(len(self.param_names)):
+            hdr[self.param_names[i]] = parameters[i]
+
+        if(header):
+            return flux[self.ind], hdr
+        else:
+            return flux[self.ind]
+
+def plot_emulator(emulator, grid, model_parameters, not_fixed, fixed):
+    
+    """Takes the emulator and given the emulator's inputed model parameters, 
+    displays the weights and Gaussian process interpolation from the SVD (PCA decomposition).
+
+    Args:
+        emulator (Starfish.emulator.emulator): Trained emulator from your grid space
+        
+        model_parameters (tuple): The numbers corresponding to the modelling parameters of the grid
+        
+        not_fixed (int): The varying model parameter number that the weights plot displays (x-axis)
+        
+        fixed (int): The python list index of the other model parameters. 
+            If a model parameter has 5 values with the grid space. 
+            Possible int ranges would be 0-4.
+        
+    Returns:
+        Plot of PCA component weights.
+    """
+    
+    # Placing the grid points values within a dictionary, keyed as 'params{}'
+    variables = {}
+    for loop in model_parameters:
+        variables["param{}".format(loop)] = np.unique(emulator.grid_points[:, model_parameters.index(loop)])
+        
+    # Creating a custom itertools.product routine which can dynamically input the free varying parameter
+    # and the length of the number of parameters depending on what is specified. 
+    # params = np.array(list(itertools.product(T, logg[:1], Z[:1]))) # <-- starfish original
+    not_fixed_index = model_parameters.index(not_fixed) # Converting parameter number to index position
+    params = []
+    temp = [variables[emulator.param_names[j]] for j in range(len(variables))] # Creating list from dictionary
+    temp2 = [np.array(temp[i]) if i==not_fixed_index else temp[i][fixed] for i in range(len(temp))] # New list fixing the other parameters on the given grid point
+    for j in range(len(temp2[not_fixed_index])): # Itertools.product calculation into the same original formatting
+        params.append(tuple([temp2[i][j] if temp2[i].size>1 else temp2[i] for i in range(len(temp2))]))
+    params = np.array(params)
+    idxs = np.array([emulator.get_index(p) for p in params])
+    weights = emulator.weights[idxs.astype("int")].T
+    if emulator.ncomps < 4:
+        fix, axes = plt.subplots(emulator.ncomps, 1, sharex=True, figsize=(8,(emulator.ncomps-1)*2))
+    else:
+        fix, axes = plt.subplots(
+            int(np.ceil(emulator.ncomps/2)), 2, sharex=True, figsize=(13,(emulator.ncomps-1)*2),)
+    axes = np.ravel(np.array(axes).T)
+    [ax.set_ylabel(f"$weights_{i}$") for i, ax in enumerate(axes)]
+    
+    param_x_axis = np.unique(emulator.grid_points[:,not_fixed_index]) # Picking out all unique not fixed parameter values
+    for i, w in enumerate(weights):
+        axes[i].plot(param_x_axis, w, "o")
+        
+    # Again as above, dynamical input for the gaussian process errors to be plotted for the specified parameter
+    param_x_axis_test = np.linspace(param_x_axis.min(), param_x_axis.max(), 100)
+    temp2[not_fixed_index] = param_x_axis_test
+    Xtest = []
+    for j in range(len(temp2[not_fixed_index])):
+        Xtest.append(tuple([temp2[i][j] if temp2[i].size>1 else temp2[i] for i in range(len(temp2))]))
+    Xtest = np.array(Xtest)
+    mus = []
+    covs = []
+    for X in Xtest:
+        m, c = emulator(X)
+        mus.append(m)
+        covs.append(c)
+    mus = np.array(mus)
+    covs = np.array(covs)
+    sigs = np.sqrt(np.diagonal(covs, axis1=-2, axis2=-1))
+    xlabel = grid.parameters_description(model_parameters)[f"param{not_fixed}"]
+    for i, (m, s) in enumerate(zip(mus.T, sigs.T)):
+        axes[i].plot(param_x_axis_test, m, "C1")
+        axes[i].fill_between(param_x_axis_test, m - (2 * s), m + (2 * s), color="C1", alpha = 0.4)
+        axes[i].set_xlabel(f"Parameter {xlabel}")
+    plt.suptitle(f"Weights for Parameter {xlabel} with the other parameters fixed to their {fixed} index grid point", fontsize=20)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
