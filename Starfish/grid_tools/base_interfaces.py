@@ -425,7 +425,7 @@ class HDF5Creator:
 
         pbar = tqdm.tqdm(all_params)
         for i, param in enumerate(pbar):
-            pbar.set_description("Processing {}".format(param))
+            pbar.set_description("Processing Grid: {}".format(param))
             # Load and process the flux
             try:
                 flux, header = self.grid_interface.load_flux(param, header=True)

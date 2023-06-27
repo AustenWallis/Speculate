@@ -1,0 +1,62 @@
+Update Version History for Speculate
+------------------------------------
+
+--------------------------------
+#### To do list (19th June 2023)
+--------------------------------
+> Update cookbook throughout. 
+> Interpolated data in stage 6 switch 3, maybe smoothen noisy data switch 2.
+> Log_amp/Log_ls global kernel calculators to estimate for stage 9.
+> Dump file for plots to be saved within. 
+> Add two functions:
+	- One to pull grid point fluxes
+	- One to pull the emulator grid point fluxes. 
+> Improve the Speculate plotting:
+    - Introduce a grid search plotting section. (maybe with stage 8).
+    - A plotting function for the emulated spectrum
+    - A plotting function for the grid space spectra
+    - Issues with normalisation reconstruction between the emulator and grid 
+        space. 
+> Emulation/grid point comparison between different numbers of PCA components. 
+> Image processing edge detection for fast-moving/discontinuous line profiles?
+
+
+---------------------------------------
+#### 27.06.2023 Latest Updates Pushed
+---------------------------------------
+> Added usecols and skiprows variable for the kgrid and short_spec_cv_grid.
+    - Usecols controls the wavelength data and flux data at a certain 
+        inclination angle. Inc angle is changable
+    - Skiprows skips the header of the data files for the grid interface to 
+        begin reading the data. Fixed for a given grid interface
+> Added 'If an emulator file exists, confirm a new emulation training run.'
+    To help stop user from accidentally overwriting of trained emulators. 
+> Added Log/scaled/linear flux scale switch to change the observational data 
+    domain and emulator work in.
+> Added default automatic emulator naming system/custom names possible. 
+> Clean up of Speculate_dev.py file to pep8 and files.
+
+--------------------------------------------------
+#### 26.05.2023 Temporary update - Troubleshooting
+--------------------------------------------------
+> Adding in new grid interface for short_spec_cv_grid.
+> Adding new short_spec_cv_grid data files short_spec_cv_grid.
+> Cookbook code updated for new interface. Text is only updated Stage 1 to 4 for 
+    troubleshooting GP interpolation misses.
+> No longer requires a separate Starfish install. The program is integrated 
+    within the Speculate folder. 
+
+
+-----------------------
+#### 25.04.2023 Updates
+-----------------------
+> Correlation grid points matrix debugging.
+> MCMC running to completion (not erroring out). 
+> Updated cookbook text.
+> Custom Starfish folder for install required (read cookbook instructions)
+> Scaling switch semi-implemented for log/scale/linear. Very small effects in 
+    outcomes. 'Log' faster but less sensitive. 
+
+
+
+

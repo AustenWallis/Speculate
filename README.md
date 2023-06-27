@@ -35,26 +35,3 @@ However, you are needed to install a suite of extra packages if you don't alread
 Keep doing $pip install or $conda installing until importing in Stage 1 stops yelling code errors at you. 
 
 Once downloaded, installed and Stage 1 completes, you should be set! 
-
-
-#### To do list (21st April 2023):
-- Find ways manipulating the data to reduce correlations between alternative grid points. (Hopefully solve uniform chains and cornerplots.) Check with starfish demo too. 
-- Interpolated data in stage 6 switch 3, check noisy data switch 2 to smoothen or not.
-- Check gaussian ball inital starting points to be tight.
-~ Log/scale/linear(unchanged) switch to change the domains the observations and emulator work in. Which is best for the data. 
-- Log_amp/Log_ls global kernel calculators for estimate for stage 9. 
-- Log-probability limits for the variable parameters. 
-
-#### 25.04.2023 Updates
-
-Correlation grid points matrix debugging.
-MCMC completing. 
-Updated cookbook.
-Custom Starfish folder for install required (read cookbook install instructions)
-Scaling switch semi-implemented for log/scale/linear. Very small effects in outcomes. 'Log' faster but less sensitive. 
-
-#### 26.05.2023 Temporary update - Troubleshooting
-
-Adding in new grid interface for short_spec_cv_grid.
-Adding new grid, short_spec_cv_grid.
-Cookbook code updated for new interface. Text is only updated Stage 1 to 4 for troubleshooting GP interpolation misses. 

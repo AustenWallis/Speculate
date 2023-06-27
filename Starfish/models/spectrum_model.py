@@ -457,7 +457,7 @@ class SpectrumModel:
 
         # Likelihood
         flux, cov = self()
-        np.fill_diagonal(cov, cov.diagonal() + 1e-10)
+        np.fill_diagonal(cov, cov.diagonal() + 1e-50) # Austen edit 1e-10 -> 1e-30
         factor, flag = cho_factor(cov, overwrite_a=True)
         logdet = 2 * np.sum(np.log(factor.diagonal()))
         R = flux - self.data.flux
@@ -732,7 +732,7 @@ class SpectrumModel:
         for key, val in priors.items():
             # Key exists
             if key not in self.params and not key.startswith("cheb"):
-                raise ValueError(f"Invalid priors. {key} not a vlid key.")
+                raise ValueError(f"Invalid priors. {key} not a valid key.")
             # has logpdf method
             if not callable(getattr(val, "logpdf", None)):
                 raise ValueError(
