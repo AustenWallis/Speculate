@@ -22,7 +22,7 @@ Update Version History for Speculate
 
 
 ---------------------------------------
-#### 27.06.2023 Latest Updates Pushed
+#### 28.06.2023 Latest Updates Pushed
 ---------------------------------------
 > Added usecols and skiprows variable for the kgrid and short_spec_cv_grid.
     - Usecols controls the wavelength data and flux data at a certain 
@@ -35,6 +35,8 @@ Update Version History for Speculate
     domain and emulator work in.
 > Added default automatic emulator naming system/custom names possible. 
 > Clean up of Speculate_dev.py file to pep8 and files.
+> Now possible to add a parameter list input for searching the grid space 
+    indexes. Useful for the plotting functions to be added. 
 
 --------------------------------------------------
 #### 26.05.2023 Temporary update - Troubleshooting

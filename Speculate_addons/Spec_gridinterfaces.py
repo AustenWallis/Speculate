@@ -321,15 +321,11 @@ class ShortSpecGridInterface(GridInterface):
             file_match = file
         return self.path + file_match # returning the correct filename/path for the parameter fluxes
 
-    def parameters_description(self, model_parameters):
-        """Provides a description of the model parameters used. Simply input the 
-        model_parameter's corresponding integers as a tuple.
-
-        Args:
-            model_parameters (tuple): Numbers of the parameters used in the model.
+    def parameters_description(self):
+        """Provides a description of the model parameters used.
 
         Returns:
-            dictionary: Description of the 'paramX' name
+            dictionary: Description of the 'paramX' names
         """
         dictionary = {
             1:"wind.mdot (msol/yr)",
@@ -337,7 +333,7 @@ class ShortSpecGridInterface(GridInterface):
             3:"KWD.v_infinity (in_units_of_vescape)",
             } # Description of the paramters
         parameters_used = {}
-        for i in model_parameters:
+        for i in self.model_parameters:
             parameters_used["param{}".format(i)] = dictionary[i]
         return parameters_used
         

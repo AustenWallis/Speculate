@@ -92,6 +92,18 @@ if shortspec == 1:
     skiprows = 81  # Starting point of data within file
     inclination = (usecols[1]-4) * 5
     emu_file_name = f'SSpec_emu_{scale}_{(usecols[1]-4) * 5}inc_{wl_range[0]}-{wl_range[1]}AA_{n_components}comp_{model_parameters_str}'
+    
+# Faster processing with python's .spec files into a hdf5 file
+# Auto-generated keyname's required to integrate with Starfish
+keyname = ["param{}{{}}".format(i) for i in model_parameters]
+keyname = ''.join(keyname)
+# Processing to HDF5 file interface
+creator = HDF5Creator(
+    grid,
+    f'Grid-Emulator_Files/{grid_file_name}.hdf5',
+    key_name=keyname,
+    wl_range=wl_range)
+creator.process_grid()
 
 # Add custom name if auto generation undesired?
 #emu_file_name = 'custom_name.hdf5' 
@@ -106,18 +118,6 @@ else:
     print(f'Emulator {emu_file_name} does not exist.')
     emu_exists = 0
     print('Create new emulator in Stage 3.')
-    
-# Faster processing with python's .spec files into a hdf5 file
-# Auto-generated keyname's required to integrate with Starfish
-keyname = ["param{}{{}}".format(i) for i in model_parameters]
-keyname = ''.join(keyname)
-# Processing to HDF5 file interface
-creator = HDF5Creator(
-    grid,
-    f'Grid-Emulator_Files/{grid_file_name}.hdf5',
-    key_name=keyname,
-    wl_range=wl_range)
-creator.process_grid()
 
 
 # %% Stage 3: Generating/training emulator
@@ -155,7 +155,7 @@ print(emu)
 
 # 4) Plotting emulator - TODO: Make better plots
 # Inputs: Displayed parameter (1-X), other parameters' fixed index (0-(X-1))
-spec.plot_emulator(emu, grid, model_parameters, 1, 0)
+spec.plot_emulator(emu, grid, 1, 0)
 # plot_new_eigenspectra(emu, 51)  # <---- Yet to implement
 
 # %% plot_new_eigenspectra function
@@ -778,26 +778,8 @@ plt.show()
 # To implement
 # %% 8.1 Search grid indexes helper
 """8.1 Search grid point indexes for Stage 9"""
-search_grid_points = 1  # Make sure to set to 0 if running a remote session!!!
-if search_grid_points == 1:
-    print("Search different indexes to find the associated grid point values")
-    print("Index range is from 0 to {}".format(len(emu.grid_points) - 1))
-    print("Type '-1' to stop searching")
-    print("Increasing the index increases the parameters grid points like an odometer")
-    print("--------------------------------------------------------------------------")
-    print("Names:", emu.param_names)
-    print("Description:", [grid.parameters_description(
-        model_parameters)[i] for i in emu.param_names])
-    while True:
-        index = int(input("Enter index input"))
-        if index == -1:
-            break
-        elif 0 <= index <= len(emu.grid_points):
-            print("Emulator grid point index {}".format(index))
-            print(emu.grid_points[index])
-        else:
-            print("Not valid input! Type integer between 0 and {} or '-1' to quit".format(
-                len(emu.grid_points) - 1))
+
+spec.search_grid_points(1, emu, grid) # <-- 1/0 switch for on/off
 
 # %% 9 Assigning model and inital conditions
 """9 Assigning the model and initial model plot"""

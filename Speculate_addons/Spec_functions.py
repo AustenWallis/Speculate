@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as st
 import itertools
 
-def plot_emulator(emulator, grid, model_parameters, not_fixed, fixed):
+def plot_emulator(emulator, grid, not_fixed, fixed):
     
     """Takes the emulator and given the emulator's inputed model parameters, 
     displays the weights and Gaussian process interpolation from the SVD (PCA decomposition).
@@ -13,7 +13,7 @@ def plot_emulator(emulator, grid, model_parameters, not_fixed, fixed):
     Args:
         emulator (Starfish.emulator.emulator): Trained emulator from your grid space
         
-        model_parameters (tuple): The numbers corresponding to the modelling parameters of the grid
+        removed: model_parameters (tuple): The numbers corresponding to the modelling parameters of the grid
         
         not_fixed (int): The varying model parameter number that the weights plot displays (x-axis)
         
@@ -27,13 +27,13 @@ def plot_emulator(emulator, grid, model_parameters, not_fixed, fixed):
     
     # Placing the grid points values within a dictionary, keyed as 'params{}'
     variables = {}
-    for loop in model_parameters:
-        variables["param{}".format(loop)] = np.unique(emulator.grid_points[:, model_parameters.index(loop)])
+    for loop in grid.model_parameters:
+        variables["param{}".format(loop)] = np.unique(emulator.grid_points[:, grid.model_parameters.index(loop)])
         
     # Creating a custom itertools.product routine which can dynamically input the free varying parameter
     # and the length of the number of parameters depending on what is specified. 
     # params = np.array(list(itertools.product(T, logg[:1], Z[:1]))) # <-- starfish original
-    not_fixed_index = model_parameters.index(not_fixed) # Converting parameter number to index position
+    not_fixed_index = grid.model_parameters.index(not_fixed) # Converting parameter number to index position
     params = []
     temp = [variables[emulator.param_names[j]] for j in range(len(variables))] # Creating list from dictionary
     temp2 = [np.array(temp[i]) if i==not_fixed_index else temp[i][fixed] for i in range(len(temp))] # New list fixing the other parameters on the given grid point
@@ -70,7 +70,7 @@ def plot_emulator(emulator, grid, model_parameters, not_fixed, fixed):
     mus = np.array(mus)
     covs = np.array(covs)
     sigs = np.sqrt(np.diagonal(covs, axis1=-2, axis2=-1))
-    xlabel = grid.parameters_description(model_parameters)[f"param{not_fixed}"]
+    xlabel = grid.parameters_description()[f"param{not_fixed}"]
     for i, (m, s) in enumerate(zip(mus.T, sigs.T)):
         axes[i].plot(param_x_axis_test, m, "C1")
         axes[i].fill_between(param_x_axis_test, m - (2 * s), m + (2 * s), color="C1", alpha = 0.4)
@@ -167,3 +167,58 @@ def unique_grid_combinations(grid):
         unique_combinations.append(list(i))
     
     return unique_combinations
+
+def plot_grid_point():
+    pass
+
+def search_grid_points(switch, emu, grid):
+    if switch == 1:
+        print("- Search index range 0 to {} to find the associated grid point values.".format(len(emu.grid_points) - 1))
+        print("- Type '-1' to stop searching.")
+        print("- Or type [Input, Parameter, Values] in a list for the specific grid point.")
+        print("- No square brackets needed, just commas.")
+        print("- Increasing the index increases the parameters grid points like an odometer.")
+        print("---------------------------------------------------------------")
+        print("Names:", emu.param_names)
+        print("Description:", [grid.parameters_description()[i] for i in emu.param_names])
+        while True:
+            user_input = input("Enter Index Value or {} Parameter Values Separated By Commas".format(
+                len(emu.param_names)))
+            user_input = user_input.split(",") # turning string input into list
+            print("-----------------------------------------------------------")
+            if len(user_input) == 1:
+                index = int(user_input[0]) # variable for integer index
+                grid_vals = None # resetting previous variables for other scenarios.
+            else:
+                grid_vals = [float(i) for i in user_input] # for parameter list
+                index = None
+            
+            # different senarios for user inputs, index or parameter values    
+            grid_points = list(emu.grid_points) # fix for enumerating 
+            if index == -1: # quit
+                break
+            
+            # integer grid point search
+            elif isinstance(index, int) and 0 <= index <= len(emu.grid_points):
+                better_display = [grid_points[index][i] for i in range(len(grid_points[index]))]
+                print("Emulator grid point index {} is".format(index), 
+                      better_display)
+            
+            # parameter grid point search        
+            elif isinstance(grid_vals, list) and len(grid_vals) == len(emu.param_names):
+                skipover = True # A variable to print if point not in emulator
+                for index, points in enumerate(grid_points): # enumerating to get index
+                    # if there is a grid point that matches the input
+                    if all(np.round(points,3) == np.round(grid_vals,3)):
+                        print("Parameter's {} is at emulator grid point index {}".format(grid_vals, index))
+                        skipover = False # to avoid printing the skipover message
+                        break # stop searching enumeration
+                if skipover:
+                    print("Grid point {} is not in the emulator".format(grid_vals))
+                    
+            # invalid input, can't find grid point
+            else:
+                print("{} Not valid input! \nType integer between 0 and {}".format(
+                    user_input, len(emu.grid_points) - 1) + 
+                    ", a parameter list of length {}".format(
+                        len(emu.grid_points[0])) + " or '-1' to quit")
