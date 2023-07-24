@@ -2,7 +2,7 @@ Update Version History for Speculate
 ------------------------------------
 
 --------------------------------
-#### To do list (19th June 2023)
+#### To do list (24th July 2023)
 --------------------------------
 > Update cookbook text
 > Interpolated data in stage 6 switch 3, maybe smoothen noisy data switch 2.
@@ -19,9 +19,8 @@ Update Version History for Speculate
 > Emulation/grid point comparison between different numbers of PCA components. 
 > Image processing edge detection for fast-moving/discontinuous line profiles?
 
-
 ---------------------------------------
-#### 28.06.2023 Latest Updates Pushed
+#### 24.07.2023 Latest Updates Pushed
 ---------------------------------------
 > STAGE 2.2 - Introduction of the 'Spectral data exploration tool'. 
     - This tool allows the user to explore the grid and emulator space to ensure
