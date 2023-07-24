@@ -4,6 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st
 import itertools
+import matplotlib
+from typing import Optional
+from tqdm import tqdm
+import bisect
+from Starfish.emulator import Emulator
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.animation import FuncAnimation
+from matplotlib.widgets import Slider, CheckButtons, Button
+
 
 def plot_emulator(emulator, grid, not_fixed, fixed):
     
@@ -79,10 +88,10 @@ def plot_emulator(emulator, grid, not_fixed, fixed):
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     
 def grid_spectrum_plot(grid, wl_range):
-    print('hi')
+    pass
 
-def emulator_spectrum_plot():
-    print('hi')
+def emulator_spectrum_plot(emu, wl_range):
+    pass
 
 def simplex(model, priors):
     """An initial simplex algorithm for training the model's Nelder_Mead routine. 
@@ -168,8 +177,6 @@ def unique_grid_combinations(grid):
     
     return unique_combinations
 
-def plot_grid_point():
-    pass
 
 def search_grid_points(switch, emu, grid):
     if switch == 1:
@@ -222,3 +229,654 @@ def search_grid_points(switch, emu, grid):
                     user_input, len(emu.grid_points) - 1) + 
                     ", a parameter list of length {}".format(
                         len(emu.grid_points[0])) + " or '-1' to quit")
+
+                
+class InspectGrid:
+    """The InspectGrid Class is a spectral data exploration tool. The Class 
+    should be opened in a new window which allows the user to explore the grid and 
+    emulator space. 
+    
+    Hence, run %matplotlib qt in the script before running this.
+    
+    Upon loading, an animation of the grid space will run. The animation can be 
+    paused by clicking the animation button or changing the grid point slider
+    manually. The animation speed can be changed with the animation speed slider.
+    
+    There are checkboxes located around the window to activate and deactivate
+    the plotting of the spectra for the current grid points, the current 
+    emulator points and any fixed spectra. The fixed spectra are added by the 
+    user with the add spectrum button. The fixed spectra can be cleared with
+    clear spectrum button. 
+    
+    The param checkbuttons fix the grid and emulator slider to certain values. 
+    This means the user can skip over certain points which aren't of interest. 
+    Whether this is if the user already knows the param1 parameter value, hence 
+    searching different values of param1 would be unnecessary. Or if the user
+    if interested to see how a certain parameter affects the spectrum. This can 
+    be investigated too. The sliders change which possible grid space parameter
+    value is used. 
+    
+    The description of the prarameters (eg, param1) is printed in the terminal
+    or interactive window as a dictionary. 
+    
+    The tool can be used with or without an emulator. This means the user can 
+    use the tool to search the grid space before deciding how to train the 
+    emulator. Simply remove the emu argument before initialising the class.
+    
+    Args: grid (Spec_gridinterfaces): The grid space to be explored.
+            The Spec_gridinterfaces class is a child class of 
+            Starfish.grid_tools.GridInterface.
+    
+        emu: Optional[Emulator] = None (Starfish.emulator.emulator): 
+            The emulator to be explored. If None, the class ignores the emulator 
+            space and removes the buttons associated with the emulator. 
+        
+    """
+    def __init__(self, grid, emu: Optional[Emulator] = None):
+        # TODO: Sort out normalisation flux to restore emulator flux back to original
+        # TODO: Add in the interpolated emulator grid button. Produce a number of 
+        #       interval points between each emulator point. 
+        
+        # Controlling the grid space ------------------------------------------|
+        self.grid = grid # adding grid to class
+        
+        # Creating a list of all unique combinations of parameters
+        # Spec_functions.py unique_grid_combinations() function
+        self.unique_combinations = []
+        for i in itertools.product(*grid.points):
+            self.unique_combinations.append(list(i))
+            
+        self.all_unique_combinations = self.unique_combinations.copy()
+        print("Available parameters:")
+        print(self.grid.parameters_description())
+        
+        # Finding the min/max flux values for the entire grid space    
+        self.entire_grid_fluxes = []
+        self.axis_min_flux = 0
+        self.axis_max_flux = 0 # low to ensure first max flux is higher
+        for indexes in range(len(self.unique_combinations)):
+            flux = grid.load_flux(self.unique_combinations[indexes])
+            self.entire_grid_fluxes.append(flux)
+            max_flux = max(flux) # assigned for 1 function evaluation, not 3
+            if max_flux > self.axis_max_flux:
+                self.axis_max_flux = max_flux # finding the highest flux value
+        
+        
+        # Initialising plot and adding grid point slider
+        self.fig, self.ax = plt.subplots(figsize=(14, 8))
+        self.fig.subplots_adjust(left=0.25, bottom=0.35) # adjusting plot size to fit slider
+        grid_axis = self.fig.add_axes([0.25, 0.2, 0.55, 0.03]) # Slider shape
+        # grid_slider_list is an updating list of grid points for the slider if freezing parameters
+        self.grid_slider_list = [i for i in range(len(self.unique_combinations))]
+        self.grid_slider = Slider(grid_axis,
+                                  'Grid Point',
+                                  0,
+                                  len(self.unique_combinations)-1,
+                                  valinit=0,
+                                  valstep=self.grid_slider_list,
+                                  initcolor='none',
+                                  handle_style={'facecolor':'black'},
+                                  color='#268BD2')
+        # If slider changes, call function to update plot to the new grid point.
+        self.grid_slider.on_changed(self.slider_updating_spectrum)
+        
+        # Plot Style (⌐▀͡ ̯ʖ▀)
+        logo = matplotlib.image.imread('Speculate_logo.png')
+        logo_ax = self.fig.add_axes([0.86, 0.85, 0.15, 0.15])
+        logo_ax.imshow(logo)
+        logo_ax.axis('off') # Stops a graph of the logo
+        plt.style.use('Solarize_Light2') # Theme
+        
+        # Visibility of grid plots button
+        grid_box = self.fig.add_axes([0.85, 0.2, 0.06, 0.04]) # Grid box shape
+        self.grid_visible = True
+        self.grid_checkbox = CheckButtons(grid_box, [' Visible'], [self.grid_visible])
+        self.grid_checkbox.on_clicked(self.grid_check_box)
+        
+         # Visibility of fixed plots button
+        fixed_box = self.fig.add_axes([0.015, 0.025, 0.06, 0.04]) # Grid box shape
+        self.fixed_visible = True
+        self.fixed_checkbox = CheckButtons(fixed_box, [' Visible'], [self.fixed_visible])
+        self.fixed_checkbox.on_clicked(self.fixed_check_box)       
+        
+        # Grid point arrow button to +/-1 grid point
+        grid_larrow_ax = self.fig.add_axes([0.1, 0.2, 0.03, 0.04]) # Arrow shape
+        self.gla = Button(grid_larrow_ax, '<') # Grid left arrow (gla)
+        self.gla.on_clicked(self.grid_left_arrow)
+        grid_rarrow_ax = self.fig.add_axes([0.13, 0.2, 0.03, 0.04]) # Arrow shape
+        self.gra = Button(grid_rarrow_ax, '>') # Grid right arrow (gra)
+        self.gra.on_clicked(self.grid_right_arrow)
+        
+        # Add grid point spectrum permanently and clear buttons
+        add_g_spectrum = self.fig.add_axes([0.01, 0.2, 0.03, 0.04]) # Button shape
+        self.ags = Button(add_g_spectrum, 'Add')
+        self.ags.on_clicked(self.add_grid_spectrum)
+        clear_g_spectrum = self.fig.add_axes([0.05, 0.2, 0.03, 0.04]) # Button shape
+        self.cgs = Button(clear_g_spectrum, 'Clear')
+        self.cgs.on_clicked(self.clear_grid_spectrum)
+        # Initialising add plot list and counter
+        self.add_grid_plots = {}
+        self.add_grid_plots_counter = 0 
+        
+        # Grid echo animation button
+        echo_g_axis = self.fig.add_axes([0.92, 0.2, 0.04, 0.04])
+        self.echo_g = Button(echo_g_axis, 'Echo')
+        self.echo_g.on_clicked(self.echo_grid_animation)
+        self.grid_echoing = False
+        # Echo ordering is necessary so that when the freeze sliders change 
+        # values and the grid/emulator sliders update, the updating plot prompt
+        # for the grid doesn't try do the emulator echo plots before the 
+        # emulator point list is updated too.
+        self.echo_ordering = True
+        self.fig.text(0.045, 0.26, 'Plot a\n Spectrum?', fontsize=12, ha='center')
+        
+        # Freezing parameters of the unique combinations with a checkbox
+        freeze_axis = self.fig.add_axes([0.01, 0.35, 0.07, 0.53]) # Checkbox shape
+        self.fig.text(0.045, 0.9, 'Fix\n parameters?', fontsize=12, ha='center')
+        self.parameter_labels = self.grid.parameters_description().keys()
+        self.parameter_checkboxes = CheckButtons(freeze_axis,
+                                                 labels=self.parameter_labels)
+        self.parameter_checkboxes.on_clicked(self.freeze_parameter_update)
+        
+        # Initialisation
+        self.freeze_sliders = {} # Slider Class for each frozen parameter
+        self.freeze_slider_history = {} # Dict recording previous slider values
+        # This is to avoid conflicting values on different sliders
+        freeze_slider_axis = [] # Adding frozen parameter sliders axes
+        self.frozen = {} # True/False dictionary for each parameter if frozen
+        self.frozen_store = {} # Dictionary to store frozen parameter indexes
+        
+        # Sliders axes correctly positioned next to corresponding checkboxs, 
+        # enabled for a dynamic number of parameters emulated
+        for i in range(len(self.parameter_labels)):
+            freeze_slider_axis.append(self.fig.add_axes(
+                [0.1, 0.735 - (0.53/(len(self.parameter_labels)+1))*i, 0.06, 0.03]))
+        
+        # Setting the slider for each possible parameter to be fixed.
+        for i in range(len(freeze_slider_axis)):
+            self.freeze_sliders[f"param{i+1}"] = Slider(freeze_slider_axis[i],
+                                                        '',
+                                                        self.grid.points[i][0],
+                                                        self.grid.points[i][-1],
+                                                        valinit=self.grid.points[i][0],
+                                                        valstep=self.grid.points[i],
+                                                        initcolor='none',
+                                                        handle_style={'facecolor':'black'})
+            self.frozen[f"param{i+1}"] = False # Start unfrozen, +1 to match params
+            self.freeze_slider_history[f"param{i+1}"] = self.freeze_sliders[f"param{i+1}"].val
+            self.freeze_sliders[f"param{i+1}"].on_changed(self.freeze_slider_update)
+        
+        # Toggle animation button and animation speed slider.
+        animation_button_ax = self.fig.add_axes([0.85, 0.025, 0.08, 0.04])
+        self.animation_button = Button(animation_button_ax, 'Animate')
+        self.animation_button.on_clicked(self.toggle_animation)
+        
+        animation_axis = self.fig.add_axes([0.75, 0.03, 0.08, 0.03])
+        self.animation_slider = Slider(animation_axis,
+                                  '< Faster | Slower >  ',
+                                  30,
+                                  500,
+                                  valinit=100,
+                                  valstep=1,
+                                  initcolor='none',
+                                  handle_style={'facecolor':'black'})
+        self.animation_slider.valtext.set_visible(False)
+        # If slider changes, call function to update plot to the new grid point.
+        self.animation_slider.on_changed(self.animation_speed)
+        
+        # Controlling the emulator space (comments see grid space)-------------|
+        if emu == None:
+            self.emu = None
+        elif emu != None:
+            self.emu = emu # adding emulator to class
+            print('Optional emulator loading.')
+        # Creating a list of all emulator fluxes
+            self.entire_emu_fluxes = []
+            for indexes in tqdm(range(len(self.emu.grid_points))):
+                flux = self.emu.load_flux(self.emu.grid_points[indexes])
+                self.entire_emu_fluxes.append(flux)
+            
+            # Adding emulator point slider    
+            emu_axis = self.fig.add_axes([0.25, 0.1, 0.55, 0.03])
+            # emu_slider_list is an updating list of emulator points for the slider if freezing parameters
+            self.emu_slider_list = [i for i in range(len(self.emu.grid_points))]
+            self.emu_slider = Slider(emu_axis,
+                                  'Emulator Point',
+                                  0,
+                                  len(self.emu.grid_points)-1,
+                                  valinit=0,
+                                  valstep=self.emu_slider_list,
+                                  initcolor='none',
+                                  handle_style={'facecolor':'black'},
+                                  color='#2AA198')
+            # If slider changes, call function to update plot to the new emu point.
+            self.emu_slider.on_changed(self.slider_updating_spectrum)
+            
+            #Visibility of emulator plots button
+            emu_box = self.fig.add_axes([0.85, 0.1, 0.06, 0.04])
+            self.emu_visible = True
+            self.emu_checkbox = CheckButtons(emu_box, [' Visible'], [self.emu_visible])
+            self.emu_checkbox.on_clicked(self.emu_check_box)
+            
+            # Emulator point arrow button to +/-1 emulator point
+            emu_arrow_ax = self.fig.add_axes([0.1, 0.1, 0.03, 0.04])
+            self.ela = Button(emu_arrow_ax, '<') # Emulator left arrow (ela)
+            self.ela.on_clicked(self.emu_left_arrow)
+            emu2_arrow_ax = self.fig.add_axes([0.13, 0.1, 0.03, 0.04])
+            self.era = Button(emu2_arrow_ax, '>') # Emulator right arrow (era)
+            self.era.on_clicked(self.emu_right_arrow)
+            
+            # Add grid point spectrum permanently and clear buttons
+            add_e_spectrum = self.fig.add_axes([0.01, 0.1, 0.03, 0.04]) # Button shape
+            self.aes = Button(add_e_spectrum, 'Add')
+            self.aes.on_clicked(self.add_emu_spectrum)
+            clear_e_spectrum = self.fig.add_axes([0.05, 0.1, 0.03, 0.04]) # Button shape
+            self.ces = Button(clear_e_spectrum, 'Clear')
+            self.ces.on_clicked(self.clear_emu_spectrum)
+            # Initialising add plot list and counter
+            self.add_emu_plots = {}
+            self.add_emu_plots_counter = 0
+            
+            # Emulator echo animation button
+            echo_e_axis = self.fig.add_axes([0.92, 0.1, 0.04, 0.04])
+            self.echo_e = Button(echo_e_axis, 'Echo')
+            self.echo_e.on_clicked(self.echo_emu_animation)
+            self.emulator_echoing = False
+            
+            # Interpolate emulator button for more finely spaced grid search
+            interpolate_axis = self.fig.add_axes([0.25, 0.025, 0.12, 0.04])
+            self.interpolate = Button(interpolate_axis, 'TODO: Interpolate Emulator?')
+            self.interpolate.on_clicked(self.interpolate_emulator)
+        
+        # ---------------------------------------------------------------------|
+        # Button (mouse) press event pauses animation on mouse click.
+        self.fig.canvas.mpl_connect('button_press_event', self.slider_pause) 
+        # Matplotlib animation iterating through frames like a while loop.
+        self.animation = FuncAnimation(
+            self.fig,
+            self.animation_setting_new_slider_value,
+            interval=self.animation_slider.val,
+            frames=len(self.unique_combinations),
+            )
+        
+        self.animation.running = True # Start animation
+        
+        plt.show() 
+
+
+    def slider_updating_spectrum(self, extra):
+        """This function plots the spectrum of the grid point selected by the 
+        slider when changed. The running animation automatically changes the 
+        slide value which prompts this function to run. The slider can be 
+        manually changed too."""
+        
+        self.ax.clear() # clearing the previous frame
+        self.ax.set_xlabel("Wavelength ($\AA$)")
+        self.ax.set_ylabel("Flux")
+        self.ax.set_xlim(min(self.grid.wl), max(self.grid.wl))
+        #self.ax.set_ylim(self.axis_min_flux, self.axis_max_flux*1.1)
+        self.ax.set_ylim(0,3.4) # TODO change when normalisation sorted
+        self.ax.set_title(f"Spectral Data Exploration Tool")
+        # Clean legend labels, 3 sig fig with 3 trailing decimal places     
+        glabel = ['{:.3f}'.format(np.round(i,3)) for i in self.unique_combinations[self.grid_slider.val]]
+        self.ax.plot(self.grid.wl,
+                     self.entire_grid_fluxes[self.grid_slider.val]*1e11,
+                     label=f'Grid:{", ".join(glabel)}',
+                     visible=self.grid_visible,
+                     ) # TODO: normalisation
+        
+
+        if self.emu != None:
+            # Clean legend labels, 3 sig fig with 3 trailing decimal places
+            elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.emu.grid_points[self.emu_slider.val]]
+            self.ax.plot(self.emu.wl, 
+                         self.entire_emu_fluxes[self.emu_slider.val], 
+                         label=f'Emulator:{", ".join(elabel)}',
+                         visible=self.emu_visible,
+                         )
+
+        # Adding the permanent plots data to a plotting axis    
+        for i in self.add_grid_plots.values():
+            self.ax.plot(i[0], i[1], label=i[2], visible=self.fixed_visible)
+            
+        if self.emu != None:
+            for i in self.add_emu_plots.values():
+                self.ax.plot(i[0], i[1], label=i[2], visible=self.fixed_visible)
+                
+        if self.grid_echoing:
+            number_of_echoes = len(self.grid_slider_list)-1 # incase small grid
+            if number_of_echoes > 5:
+                number_of_echoes = 5 # maximum 5 echoes
+            current = self.grid_slider_list.index(self.grid_slider.val)
+            for previous in range(1,number_of_echoes+1): # 5 previous indexes
+                last = current - previous # previous indexes
+                plot_index = self.grid_slider_list[last] # previous slider index
+                self.ax.plot(self.grid.wl,
+                             self.entire_grid_fluxes[plot_index]*1e11,
+                             visible=self.grid_visible,
+                             alpha=1-(previous+1)/10,
+                             color='#268BD2'
+                             )
+        
+        if self.emu != None:
+            if self.emulator_echoing:
+                if self.echo_ordering: # To stop prompt before frozen slider updates
+                    number_of_echoes = len(self.emu_slider_list)-1 # incase small grid
+                    if number_of_echoes > 5:
+                        number_of_echoes = 5 # maximum 5 echoes
+                    current = self.emu_slider_list.index(self.emu_slider.val)
+                    for previous in range(1,number_of_echoes+1): # 5 previous indexes
+                        last = current - previous # previous indexes
+                        plot_index = self.emu_slider_list[last] # previous slider index
+                        self.ax.plot(self.emu.wl,
+                                    self.entire_emu_fluxes[plot_index],
+                                    visible=self.emu_visible,
+                                    alpha=1-(previous+1)/10,
+                                    color='#2AA198'
+                                    )
+            
+        self.ax.legend()
+        self.fig.canvas.draw_idle()
+
+
+    def animation_speed(self, event):
+        """Upon animation speed slider change, updating matplotlib's 
+        animation interval value."""
+
+        self.animation._interval = self.animation_slider.val 
+
+
+    def animation_setting_new_slider_value(self, i):
+        """This function updates the slider value for the next frame of the 
+        animation (the animation is treated like a while loop). 
+        The iteration increases the slider value by 1, which prompts the slider
+        to update the plot to the next grid point.
+        
+        Args: i (int): The current frame of the animation. WE DO NOT USE THIS
+        VALUE!!! but it is required for the FuncAnimation function to run. We 
+        explicitly update the next slider value in case the user uses the slider.
+        The animation will then continue from the last slider value (not the 
+        last frame value). A change in the slider value will prompt an updated 
+        plot."""
+        
+        if self.animation.running:
+            # Setting the next grid point slider value
+            grid_current_val = self.grid_slider.val # current slider value
+            # check if slider value is in list after freezing parameters
+            if grid_current_val in self.grid_slider_list: 
+                grid_slider_index = self.grid_slider_list.index(grid_current_val)
+            else:
+                grid_slider_index = 0
+            # check if slider value is the last in the list or continue
+            if grid_slider_index == len(self.grid_slider_list)-1:
+                grid_next_val = self.grid_slider_list[0]
+            else:
+                grid_next_val = self.grid_slider_list[grid_slider_index + 1]
+            self.grid_slider.set_val(grid_next_val) # prompting next slider plot
+
+            if self.emu != None:
+                # Setting the next emulator point slider value
+                emu_current_val = self.emu_slider.val # Current slider value
+                if emu_current_val in self.emu_slider_list:
+                    emu_slider_index = self.emu_slider_list.index(emu_current_val)
+                else:
+                    emu_slider_index = 0
+                # Check if slider value is the last in the list or continue
+                if emu_slider_index == len(self.emu_slider_list)-1:
+                    emu_next_val = self.emu_slider_list[0]
+                else:
+                    emu_next_val = self.emu_slider_list[emu_slider_index + 1]
+                self.emu_slider.set_val(emu_next_val)
+                
+                
+    def grid_check_box(self, event):
+        """This function toggles the visibility of the grid 
+        spectra. It is called when the user clicks the check boxes."""
+        
+        self.grid_visible = not self.grid_visible
+        self.grid_slider.set_val(self.grid_slider.val) # updating the plot
+        return self.grid_visible
+    
+
+    def fixed_check_box(self, event):
+        """This function toggles the visibility of the fixed plotted 
+        spectra. It is called when the user clicks the check boxes."""
+        
+        self.fixed_visible = not self.fixed_visible
+        self.grid_slider.set_val(self.grid_slider.val) # updating the plot
+        return self.fixed_visible
+    
+    
+    def emu_check_box(self, event):
+        """This function toggles the visibility of the emulator 
+        spectra. It is called when the user clicks the check boxes."""
+        
+        self.emu_visible = not self.emu_visible
+        self.emu_slider.set_val(self.emu_slider.val)
+        return self.emu_visible
+        
+    
+    def slider_pause(self, event, *args, **kwargs):
+        """Pauses/unpauses the animation on mouse click anywhere on the slider."""
+        
+        # Identifying the slider's location on the figure
+        (xm,ym),(xM,yM) = self.grid_slider.label.clipbox.get_points()
+        if self.emu != None:
+            (xm2,ym2),(xM2,yM2) = self.emu_slider.label.clipbox.get_points()
+            
+        if xm < event.x < xM and ym < event.y < yM: # if clicking slider, pause
+            self.animation.pause()
+            self.animation.running = False
+        elif self.emu != None:
+            if xm2 < event.x < xM2 and ym2 < event.y < yM2:
+                self.animation.pause()
+                self.animation.running = False
+    
+    
+    def freeze_parameter_update(self, label):
+        """The function freezes the parameter checkbox selected by the user."""
+        
+        self.frozen[label] = not self.frozen[label] # toggle True/False from checkbox
+        # if parameter frozen, we need to remove non-matching grid points.
+        if self.frozen[label] == True:
+            index = int(label[-1]) - 1 # number from the paramX label minus 1 for index
+            fixed_param_slider_value = self.freeze_sliders[label].val # value of the slider
+            # Indexes to be removed from grid point slider list, if the value of
+            # the fixed parameter slider doesn't match the grid point value.
+            removing_indexes = [] 
+            removing_indexes = [count for count, values in 
+                                          enumerate(self.all_unique_combinations) 
+                                          if values[index] != fixed_param_slider_value]
+            
+            # Removing grid points
+            for grid_point in removing_indexes: 
+                present = False # initially assuming not frozen
+                for forzen_list in self.frozen_store.values():
+                    if grid_point in forzen_list:
+                        present = True # if in frozen store, then don't remove again
+                        break # if found, no need to continue
+                if present == False: # if not frozen, remove from list
+                    self.grid_slider_list.remove(grid_point)
+            
+            # Removing emulator points if used
+            if self.emu != None:
+                for emu_point in removing_indexes:
+                    present = False # initially assuming not frozen
+                    for forzen_list in self.frozen_store.values():
+                        if emu_point in forzen_list:
+                            present = True # if in frozen store, then don't remove again
+                            break # if found, no need to continue
+                    if present == False: # if not frozen, remove from list
+                        self.emu_slider_list.remove(emu_point)
+            
+            # Storing indexes to not compute again when unfreezing
+            self.frozen_store[label] = removing_indexes
+            
+        # if parameter unfrozen, we need to add non-matching grid points.   
+        elif self.frozen[label] == False:
+            adding_indexes = self.frozen_store[label] # retrieve stored indexes
+            # reset label to None, but using [-1] as it doesn't break iteration 
+            # loops in code. -1 will never be a grid point index value.
+            self.frozen_store[label] = [-1]
+            for grid_point in adding_indexes:
+                present = False # initially assuming not frozen
+                for forzen_list in self.frozen_store.values():
+                    if grid_point in forzen_list:
+                        present = True # if in frozen store, then keep frozen
+                        break # if found, no need to continue
+                if present == False: # if not frozen, add to list
+                    bisect.insort(self.grid_slider_list, grid_point)
+                    
+            if self.emu != None:
+                for grid_point in adding_indexes:
+                    present = False # initially assuming not frozen
+                    for forzen_list in self.frozen_store.values():
+                        if grid_point in forzen_list:
+                            present = True # if in frozen store, then keep frozen
+                            break # if found, no need to continue
+                    if present == False: # if not frozen, add to list
+                        bisect.insort(self.emu_slider_list, grid_point) # adding to sorted list
+        
+        # If frozen to a parameter combination not currently displayed
+        # The plot updates to the first parameter combination possible. 
+        if self.grid_slider.val not in self.grid_slider_list:
+            self.echo_ordering = not self.echo_ordering # Need so emu echo doesn't error
+            self.grid_slider.set_val(self.grid_slider_list[0])
+        if self.emu != None:
+            if self.emu_slider.val not in self.emu_slider_list:
+                self.echo_ordering = not self.echo_ordering # Let echo emu proceed.
+                self.emu_slider.set_val(self.emu_slider_list[0])
+
+ 
+    def freeze_slider_update(self, event):
+        """This function updates the frozen slider parameter value for plotting."""
+        
+        for label in self.freeze_sliders.keys():
+           if self.freeze_sliders[label].val != self.freeze_slider_history[label] and self.frozen[label] == True: 
+               # Update history to current (new) slider value
+               self.freeze_slider_history[label] = self.freeze_sliders[label].val
+               self.freeze_parameter_update(label) # Adding old points back
+               self.freeze_parameter_update(label) # Removing new frozen points
+               break # when found, no need to continue
+    
+    
+    def grid_left_arrow(self, event):
+        """Button press pauses the animation and moves the slider left by -1.
+        If fixed parameter list, it moves to the next possible fixed parameter
+        value."""
+        
+        self.animation.pause()
+        self.animation.running = False
+        current = self.grid_slider_list.index(self.grid_slider.val)
+        self.grid_slider.set_val(self.grid_slider_list[current-1])
+        
+        
+    def grid_right_arrow(self, event):
+        """Button press pauses the animation and moves the slider right by +1.
+        If fixed parameter list, it moves to the next possible fixed parameter
+        value."""
+        
+        self.animation.pause()
+        self.animation.running = False
+        current = self.grid_slider_list.index(self.grid_slider.val)
+        if current + 1 == len(self.grid_slider_list): # if next outside list
+            current = -1 # start at beginning of list again
+        self.grid_slider.set_val(self.grid_slider_list[current+1])
+        
+        
+    def emu_left_arrow(self, event):
+        """Button press pauses the animation and moves the slider left by -1.
+        If fixed parameter list, it moves to the next possible fixed parameter
+        value."""
+        
+        self.animation.pause()
+        self.animation.running = False
+        current = self.emu_slider_list.index(self.emu_slider.val)
+        self.emu_slider.set_val(self.emu_slider_list[current-1])
+        
+        
+    def emu_right_arrow(self, event):
+        """Button press pauses the animation and moves the slider right by +1.
+        If fixed parameter list, it moves to the next possible fixed parameter
+        value."""
+        
+        self.animation.running = False
+        current = self.emu_slider_list.index(self.emu_slider.val)
+        if current + 1 == len(self.emu_slider_list): # if next outside list
+            current = -1 # start at beginning of list again
+        self.emu_slider.set_val(self.emu_slider_list[current+1])
+        
+        
+    def add_grid_spectrum(self, event):
+        """Adding the current grid plot to a list to be permanently plotted 
+        each animation frame until cleared."""
+        
+        self.add_grid_plots_counter += 1 # iterator for dictionary key
+        # Clean legend labels, 3 sig fig with 3 trailing decimal places
+        glabel = ['{:.3f}'.format(np.round(i,3)) for i in self.unique_combinations[self.grid_slider.val]]
+        # Warning! Adding the current plot's data to a list which is placed in a 
+        # dictionary called self.add_grid_plots. This is done this way 
+        # as for some reason creating a matplotlib self.ax.plot here doesn't 
+        # plot when called in slider_updating_spectrum. This can likely be fixed.
+        plotting_list = [self.grid.wl, self.entire_grid_fluxes[self.grid_slider.val]*1e11, f'Grid{self.add_grid_plots_counter}:{", ".join(glabel)}', self.grid_visible]
+        self.add_grid_plots[self.add_grid_plots_counter] = plotting_list
+        self.grid_slider.set_val(self.grid_slider.val) # refreshing the plot
+        # TODO Normalisation constant here too. 
+        
+        
+    def clear_grid_spectrum(self, event):
+        """Removing the permanent plotting list on pressing the clear button"""
+        
+        self.add_grid_plots = {}
+        self.add_grid_plots_counter = 0 
+        self.grid_slider.set_val(self.grid_slider.val) # refreshing the plot
+    
+    def add_emu_spectrum(self, event):
+        """Adding the current emulator plot to a list to be permanently plotted 
+        each animation frame until cleared."""
+        
+        self.add_emu_plots_counter += 1 # iterator for dictionary key
+        # Clean legend labels, 3 sig fig with 3 trailing decimal places
+        elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.emu.grid_points[self.emu_slider.val]]
+        # Warning! Adding the current plot's data to a list which is placed in a 
+        # dictionary called self.add_grid_plots. This is done this way 
+        # as for some reason creating a matplotlib self.ax.plot here doesn't 
+        # plot when called in slider_updating_spectrum. This can likely be fixed.
+        plotting_list = [self.emu.wl, self.entire_emu_fluxes[self.emu_slider.val], f'Emu{self.add_emu_plots_counter}:{", ".join(elabel)}', self.emu_visible]
+        self.add_emu_plots[self.add_emu_plots_counter] = plotting_list
+        self.emu_slider.set_val(self.emu_slider.val) # refreshing the plot
+    
+    
+    def clear_emu_spectrum(self, event):
+        """Removing the permanent plotting list on pressing the clear button"""
+        
+        self.add_emu_plots = {}
+        self.add_emu_plots_counter = 0
+        self.emu_slider.set_val(self.emu_slider.val) # refreshing the plot
+    
+    def echo_grid_animation(self, event):
+        "Pressing echo button toggles echo plotting for the grid"
+        
+        self.grid_echoing = not self.grid_echoing
+        self.grid_slider.set_val(self.grid_slider.val) # refreshing the plot
+    
+    def echo_emu_animation(self, event):
+        "Pressing echo button toggles echo plotting for the emulator"
+        
+        self.emulator_echoing = not self.emulator_echoing
+        self.emu_slider.set_val(self.emu_slider.val) # refreshing the plot
+    
+    
+    def interpolate_emulator(self, event):
+        pass
+    
+    
+    def toggle_animation(self, event):
+        """Button press pauses and unpauses the animation."""
+        
+        if self.animation.running:
+            self.animation.pause()
+            self.animation.running = False
+        else:
+            self.animation.resume()
+            self.animation.running = True
