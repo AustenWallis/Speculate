@@ -1,6 +1,8 @@
 # Speculate
 
-## The spectral emulator built for 'python', in python...
+<img src="Speculate_logo2.png" width="500" align="centre"> 
+
+## The spectral emulator built for '[python](https://github.com/agnwinds/python)', in python...
 
 Designed for the rapid testing of an observational spectrum to determine the physical properties of the astronomical object. 
 
@@ -16,10 +18,13 @@ The speculate directory contains a number of items:
 - <u>**Speculate_dev.py**</u> - Dev version of speculate. This version is likely the most current iteration but may not run correctly. I run it in VS Code utilising a mix of intel/m1 anaconda environment's. With Jupyter extenstions, the `# %%` allows the code to be run like a notebook. Alternatively, you could simply run the file but you'll be unable to pause the code at certain points, which again may break the code if certain 0/1 switches in the code are incorrectly on/off.
 - <u>**kgrid**</u> - This stores a ss-cygni cv test grid you can create an emulator from. You can place any cv data spectrum file from 'python' as a data/observation source in this directory. Example, like 'ss_cyg_1.spec'. Speculate can then attempt to find the parameters for this data/observation file (see stage 6). **sscyg_k2.ls** - Metadata of the kgrid (file names corresponding to parameters/variable names.)
 - <u>**short_spec_cv_grid**</u> - This stores a default cv blackbody python v87a grid space of 3 parameters. For reference, a template.pf 'python' file is here that the grid was made from.
+- <u>**observation_files**</u> - This is a folder to store any observations you wish to introduce into Speculate. 
 - <u>**plots**</u> - This is a dumping folder to place any saved plots in the code.
 - <u>**Grid-Emulator_Files**</u> - This is where your saved grid, emulator and MCMC files are saved. Ensure your file names are systematic and explicit so that you can retrieve previous trained emulators and mcmc runs. Otherwise, you may rerun and overwrite accidentally. 
 - <u>**Speculate_addons**</u> - This stores the additional import modules such as grid interfaces for Speculate's grids and other functions.
 - <u>**Starfish**</u> - This is the original Starfish program. This stores the import module necessary for the program to run.
+- <u>**Speculate_logos.png**</u> - Logo images
+- <u>**Speculate_Scrap_Scripts.py/ipynb**</u> - A dump of old code incase needed for some random reason.
 - <u>**.gitattributes** and **README.md**</u> - GitHub features. 
 
 
