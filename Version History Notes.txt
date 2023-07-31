@@ -14,15 +14,20 @@ Update Version History for Speculate
 > Improve the Speculate plotting:
     - A plotting function for the emulated spectrum
     - A plotting function for the grid space spectra
-    - Issues with normalisation reconstruction between the emulator and grid 
-        space. 
 > Emulation/grid point comparison between different numbers of PCA components. 
 > Image processing edge detection for fast-moving/discontinuous line profiles?
 
 ---------------------------------------
-#### 24.07.2023 Latest Updates Pushed
+#### 31.07.2023 Latest Updates Pushed
 ---------------------------------------
-> STAGE 2.2 - Introduction of the 'Spectral data exploration tool'. 
+> Reversed normalisation between the emulator and grid 
+        space in Stage 2.2 with Starfish's original method for the SDET.
+> Updated cookbook text for stage 2.2 with normalisation info. 
+
+---------------------------------------
+#### 24.07.2023 Updates
+---------------------------------------
+> STAGE 2.2 - Introduction of the 'Spectral data exploration tool' (SDET). 
     - This tool allows the user to explore the grid and emulator space to ensure
     the data inputted into the emulator training and the output is approiate. 
     - Details can be found in the cookbook and the class doctoring. 

@@ -163,6 +163,12 @@ print(emu)
 # Inputs: Displayed parameter (1-X), other parameters' fixed index (0-(X-1))
 spec.plot_emulator(emu, grid, 1, 0)
 # plot_new_eigenspectra(emu, 51)  # <---- Yet to implement
+# %%
+
+# Normalisation Debugging =====================================================|
+
+
+# =============================================================================|
 
 # %% plot_new_eigenspectra function
 
@@ -461,12 +467,14 @@ model = SpectrumModel(
     f'Grid-Emulator_Files/{emu_file_name}.hdf5',
     data,
     # [list, of , grid , points]emu.grid_points[119] [-8.95, 10.26, 1.82]
-    grid_params=list(emu.grid_points[80]),
+    grid_params=list(emu.grid_points[59]),
+    norm=False,
     Av=0,
     global_cov=dict(log_amp=log_amp, log_ls=log_ls)
 )
 print(model)
 model.plot(yscale="linear")
+
 model_flux, model_cov = model()
 plt.matshow(model._glob_cov, cmap='Greens')
 plt.title("Global Covariance Matrix")

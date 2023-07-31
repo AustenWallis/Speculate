@@ -12,7 +12,7 @@ from Starfish.emulator import Emulator
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Slider, CheckButtons, Button
-
+from Starfish.transforms import rescale, _get_renorm_factor
 
 def plot_emulator(emulator, grid, not_fixed, fixed):
     
@@ -256,12 +256,14 @@ class InspectGrid:
     be investigated too. The sliders change which possible grid space parameter
     value is used. 
     
-    The description of the prarameters (eg, param1) is printed in the terminal
+    The description of the parameters (eg, param1) is printed in the terminal
     or interactive window as a dictionary. 
     
     The tool can be used with or without an emulator. This means the user can 
     use the tool to search the grid space before deciding how to train the 
     emulator. Simply remove the emu argument before initialising the class.
+    
+    # TODO: Can improve the class to be more pythonic as I get better at OOP.
     
     Args: grid (Spec_gridinterfaces): The grid space to be explored.
             The Spec_gridinterfaces class is a child class of 
@@ -273,7 +275,6 @@ class InspectGrid:
         
     """
     def __init__(self, grid, emu: Optional[Emulator] = None):
-        # TODO: Sort out normalisation flux to restore emulator flux back to original
         # TODO: Add in the interpolated emulator grid button. Produce a number of 
         #       interval points between each emulator point. 
         
@@ -321,7 +322,7 @@ class InspectGrid:
         self.grid_slider.on_changed(self.slider_updating_spectrum)
         
         # Plot Style (⌐▀͡ ̯ʖ▀)
-        logo = matplotlib.image.imread('Speculate_logo.png')
+        logo = matplotlib.image.imread('logos/Speculate_logo.png')
         logo_ax = self.fig.add_axes([0.86, 0.85, 0.15, 0.15])
         logo_ax.imshow(logo)
         logo_ax.axis('off') # Stops a graph of the logo
@@ -430,10 +431,10 @@ class InspectGrid:
         elif emu != None:
             self.emu = emu # adding emulator to class
             print('Optional emulator loading.')
-        # Creating a list of all emulator fluxes
+        # Creating a list of all emulator fluxes, normalised to the grid fluxes
             self.entire_emu_fluxes = []
             for indexes in tqdm(range(len(self.emu.grid_points))):
-                flux = self.emu.load_flux(self.emu.grid_points[indexes])
+                flux = self.emu.load_flux(self.emu.grid_points[indexes], norm=True)
                 self.entire_emu_fluxes.append(flux)
             
             # Adding emulator point slider    
@@ -514,16 +515,16 @@ class InspectGrid:
         self.ax.set_xlabel("Wavelength ($\AA$)")
         self.ax.set_ylabel("Flux")
         self.ax.set_xlim(min(self.grid.wl), max(self.grid.wl))
-        #self.ax.set_ylim(self.axis_min_flux, self.axis_max_flux*1.1)
-        self.ax.set_ylim(0,3.4) # TODO change when normalisation sorted
+        self.ax.set_ylim(self.axis_min_flux*0.9, self.axis_max_flux*1.1)
+        #self.ax.set_ylim(0,3.4) 
         self.ax.set_title(f"Spectral Data Exploration Tool")
         # Clean legend labels, 3 sig fig with 3 trailing decimal places     
         glabel = ['{:.3f}'.format(np.round(i,3)) for i in self.unique_combinations[self.grid_slider.val]]
         self.ax.plot(self.grid.wl,
-                     self.entire_grid_fluxes[self.grid_slider.val]*1e11,
+                     self.entire_grid_fluxes[self.grid_slider.val],
                      label=f'Grid:{", ".join(glabel)}',
                      visible=self.grid_visible,
-                     ) # TODO: normalisation
+                     )
         
 
         if self.emu != None:
@@ -581,7 +582,9 @@ class InspectGrid:
 
     def animation_speed(self, event):
         """Upon animation speed slider change, updating matplotlib's 
-        animation interval value."""
+        animation interval value. This could break if matplotlib does something
+        stupid with the animation class as _interval is a private variable.
+        However, not using it is a massive pain to make this function work."""
 
         self.animation._interval = self.animation_slider.val 
 
