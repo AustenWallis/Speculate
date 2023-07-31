@@ -1,7 +1,6 @@
-frozen = [ "Av",]
+frozen = []
 
 [parameters]
-Av = 0
 param1 = -9.433638055241886
 param2 = 6.792602446408731
 param3 = 2.9999999987406425

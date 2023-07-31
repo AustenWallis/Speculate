@@ -364,7 +364,7 @@ class SpectrumModel:
         return flux, cov
     
     
-    def flux_non_normalised(self):
+    def flux_normalised(self):
         """
         Speculate addition - similar to __call__() but only returns flux values
         
@@ -420,7 +420,6 @@ class SpectrumModel:
             scale = np.exp(self.params["log_scale"]) * norm
 
         flux = rescale(flux, scale)
-        X = rescale(X, scale)
         
         return flux
     

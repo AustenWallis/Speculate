@@ -701,3 +701,7 @@ plt.show()
     else:
         model.set_param_vector(P)
         return model.log_likelihood(priors)"""
+        
+# %% 
+    
+# %%
