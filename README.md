@@ -1,6 +1,6 @@
 # Speculate
 
-<img src="Speculate_logo2.png" width="500" align="centre"> 
+<img src="logos/Speculate_logo2.png" width="500" align="centre"> 
 
 ## The spectral emulator built for '[python](https://github.com/agnwinds/python)', in python...
 
