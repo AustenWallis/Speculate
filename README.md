@@ -23,8 +23,9 @@ The speculate directory contains a number of items:
 - <u>**Grid-Emulator_Files**</u> - This is where your saved grid, emulator and MCMC files are saved. Ensure your file names are systematic and explicit so that you can retrieve previous trained emulators and mcmc runs. Otherwise, you may rerun and overwrite accidentally. 
 - <u>**Speculate_addons**</u> - This stores the additional import modules such as grid interfaces for Speculate's grids and other functions.
 - <u>**Starfish**</u> - This is the original Starfish program. This stores the import module necessary for the program to run.
-- <u>**Speculate_logos.png**</u> - Logo images
-- <u>**Speculate_Scrap_Scripts.py/ipynb**</u> - A dump of old code incase needed for some random reason.
+- <u>**logos**</u> - Contains speculate logos png files
+- <u>**old_scrap_scripts**</u> - A dumping ground for old code that isn't used but could be useful some day or as reference material to what happen previous. Also used for just trialing random code. This will be removed if released and out of development stages.
+- <u>**Version History Notes.txt**</u> - Bonus notes on the new features implements and the TODO list for future updates. 
 - <u>**.gitattributes** and **README.md**</u> - GitHub features. 
 
 
