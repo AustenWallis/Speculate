@@ -7,18 +7,29 @@ Update Version History for Speculate
 > Update cookbook text
 > Interpolated data in stage 6 switch 3, maybe smoothen noisy data switch 2.
 > Log_amp/Log_ls global kernel calculators to estimate for stage 9.
-> Dump file for plots to be saved within. 
+> Dump file for plots to be saved within.
 > Add two functions:
 	- One to pull grid point fluxes
-	- One to pull the emulator grid point fluxes. 
+	- One to pull the emulator grid point fluxes.
 > Improve the Speculate plotting:
     - A plotting function for the emulated spectrum
     - A plotting function for the grid space spectra
-> Emulation/grid point comparison between different numbers of PCA components. 
+> Emulation/grid point comparison between different numbers of PCA components.
 > Image processing edge detection for fast-moving/discontinuous line profiles?
+> Difference between 524 and 522 wavelength points for emulator and grid
 
 ---------------------------------------
-#### 31.07.2023 Latest Updates Pushed
+#### 07.08.2023 Latest Updates Pushed
+---------------------------------------
+> Added dimensionless data plotting to the SDET to view data how the PCA process
+        would see the grid. 
+> Added Interpolate Emulator button for the SDET to view finer unique parameter 
+        combinations.
+> Fixed a couple bugs with the SDET.
+> Cookbook text update for the new features in the SDET (Stage 2.2)
+
+---------------------------------------
+#### 31.07.2023 
 ---------------------------------------
 > Reversed normalisation between the emulator and grid 
         space in Stage 2.2 with Starfish's original method for the SDET.
