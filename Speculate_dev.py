@@ -58,7 +58,7 @@ grid_file_name = 'Grid_full'  # Builds fast, file save unnessary.
 kgrid = 0                     # Turn on if planning to use kgrid
 shortspec = 1                 # Turn on if planning to use shortspec_cv_grid
 
-n_components = 4              # Alter the number of PCA components used.
+n_components = 5              # Alter the number of PCA components used.
 # Integer for no. of components or decimal (0.0-1.0) for 0%-100% accuracy.
 # -----------------------------------------------------------------------------|
 
@@ -118,7 +118,7 @@ else:
     emu_exists = 0
     print('Create new emulator in Stage 3.')
 
-# %% Stage 2.2) Speculate's spectral data exploration tool.
+# %% Stage 2.2) Speculate's spectral data exploration tool (SDET).
 # =============================================================================|
 # The Class should open a new window to allow the user to explore the grid.
 
