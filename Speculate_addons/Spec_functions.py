@@ -274,10 +274,7 @@ class InspectGrid:
             space and removes the buttons associated with the emulator. 
         
     """
-    def __init__(self, grid, emu: Optional[Emulator] = None):
-        # TODO: Add in the interpolated emulator grid button. Produce a number of 
-        #       interval points between each emulator point. 
-        
+    def __init__(self, grid, emu: Optional[Emulator] = None): 
         # Controlling the grid space ------------------------------------------|
         self.grid = grid # adding grid to class
         
@@ -302,6 +299,29 @@ class InspectGrid:
             if max_flux > self.axis_max_flux:
                 self.axis_max_flux = max_flux # finding the highest flux value
         
+        # Producing a dimensionless data set for the entire grid space
+        self.dimensionless_grid_fluxes = np.array(self.entire_grid_fluxes)
+        # Fluxes.mean(1) does the mean across the rows of the flux grid -
+        # i.e. the mean flux of each spectrum.
+        norm_factors = self.dimensionless_grid_fluxes.mean(1)
+        self.dimensionless_grid_fluxes /= norm_factors[:, np.newaxis]
+        # fluxes.mean(0) does the mean across the columns - 
+        # i.e. the mean flux at each wavelength bin.
+        flux_mean = self.dimensionless_grid_fluxes.mean(0)
+        self.dimensionless_grid_fluxes -= flux_mean
+        # fluxes.std(0) does the standard deviation across the columns -
+        # i.e. the standard deviation of the flux at each wavelength bin.
+        flux_std = self.dimensionless_grid_fluxes.std(0)
+        self.dimensionless_grid_fluxes /= flux_std
+        # Set min and max values for the y axis of the plot
+        self.dimensionless_axis_min_flux = 1e50 # Initialisationa at high values
+        self.dimensionless_axis_max_flux = 1e-50
+        for indexes in range(len(self.dimensionless_grid_fluxes)): # iterate spectra
+            flux = self.dimensionless_grid_fluxes[indexes]
+            if min(flux) < self.dimensionless_axis_min_flux:
+                self.dimensionless_axis_min_flux = min(flux)
+            if max(flux) > self.dimensionless_axis_max_flux:
+                self.dimensionless_axis_max_flux = max(flux)
         
         # Initialising plot and adding grid point slider
         self.fig, self.ax = plt.subplots(figsize=(14, 8))
@@ -327,6 +347,12 @@ class InspectGrid:
         logo_ax.imshow(logo)
         logo_ax.axis('off') # Stops a graph of the logo
         plt.style.use('Solarize_Light2') # Theme
+        
+        # Dimensionless spectra button
+        dimensionless_data_box = self.fig.add_axes([0.10, 0.9, 0.10, 0.04]) # Box shape
+        self.dimensionless_data = False
+        self.dimensionless_data_checkbox = CheckButtons(dimensionless_data_box, [' Dimensionless'], [self.dimensionless_data])
+        self.dimensionless_data_checkbox.on_clicked(self.dimensionless_data_function)
         
         # Visibility of grid plots button
         grid_box = self.fig.add_axes([0.85, 0.2, 0.06, 0.04]) # Grid box shape
@@ -437,11 +463,26 @@ class InspectGrid:
                 flux = self.emu.load_flux(self.emu.grid_points[indexes], norm=True)
                 self.entire_emu_fluxes.append(flux)
             
+            # Producing a dimensionless data set for the entire emulator space
+            self.dimensionless_emu_fluxes = np.array(self.entire_emu_fluxes)
+            # Fluxes.mean(1) does the mean across the rows of the flux grid -
+            # i.e. the mean flux of each spectrum.
+            norm_factors = self.dimensionless_emu_fluxes.mean(1)
+            self.dimensionless_emu_fluxes /= norm_factors[:, np.newaxis]
+            # fluxes.mean(0) does the mean across the columns - 
+            # i.e. the mean flux at each wavelength bin.
+            flux_mean = self.dimensionless_emu_fluxes.mean(0)
+            self.dimensionless_emu_fluxes -= flux_mean
+            # fluxes.std(0) does the standard deviation across the columns -
+            # i.e. the standard deviation of the flux at each wavelength bin.
+            flux_std = self.dimensionless_emu_fluxes.std(0)
+            self.dimensionless_emu_fluxes /= flux_std
+            
             # Adding emulator point slider    
-            emu_axis = self.fig.add_axes([0.25, 0.1, 0.55, 0.03])
+            self.emu_axis = self.fig.add_axes([0.25, 0.1, 0.55, 0.03])
             # emu_slider_list is an updating list of emulator points for the slider if freezing parameters
             self.emu_slider_list = [i for i in range(len(self.emu.grid_points))]
-            self.emu_slider = Slider(emu_axis,
+            self.emu_slider = Slider(self.emu_axis,
                                   'Emulator Point',
                                   0,
                                   len(self.emu.grid_points)-1,
@@ -453,10 +494,10 @@ class InspectGrid:
             # If slider changes, call function to update plot to the new emu point.
             self.emu_slider.on_changed(self.slider_updating_spectrum)
             
-            #Visibility of emulator plots button
-            emu_box = self.fig.add_axes([0.85, 0.1, 0.06, 0.04])
+            # Visibility of emulator plots button
+            self.emu_box = self.fig.add_axes([0.85, 0.1, 0.06, 0.04])
             self.emu_visible = True
-            self.emu_checkbox = CheckButtons(emu_box, [' Visible'], [self.emu_visible])
+            self.emu_checkbox = CheckButtons(self.emu_box, [' Visible'], [self.emu_visible])
             self.emu_checkbox.on_clicked(self.emu_check_box)
             
             # Emulator point arrow button to +/-1 emulator point
@@ -468,26 +509,29 @@ class InspectGrid:
             self.era.on_clicked(self.emu_right_arrow)
             
             # Add grid point spectrum permanently and clear buttons
-            add_e_spectrum = self.fig.add_axes([0.01, 0.1, 0.03, 0.04]) # Button shape
-            self.aes = Button(add_e_spectrum, 'Add')
+            add_emu_spectrum = self.fig.add_axes([0.01, 0.1, 0.03, 0.04]) # Button shape
+            self.aes = Button(add_emu_spectrum, 'Add')
             self.aes.on_clicked(self.add_emu_spectrum)
-            clear_e_spectrum = self.fig.add_axes([0.05, 0.1, 0.03, 0.04]) # Button shape
-            self.ces = Button(clear_e_spectrum, 'Clear')
+            clear_emu_spectrum = self.fig.add_axes([0.05, 0.1, 0.03, 0.04]) # Button shape
+            self.ces = Button(clear_emu_spectrum, 'Clear')
             self.ces.on_clicked(self.clear_emu_spectrum)
             # Initialising add plot list and counter
             self.add_emu_plots = {}
             self.add_emu_plots_counter = 0
             
             # Emulator echo animation button
-            echo_e_axis = self.fig.add_axes([0.92, 0.1, 0.04, 0.04])
-            self.echo_e = Button(echo_e_axis, 'Echo')
+            self.echo_e_axis = self.fig.add_axes([0.92, 0.1, 0.04, 0.04])
+            self.echo_e = Button(self.echo_e_axis, 'Echo')
             self.echo_e.on_clicked(self.echo_emu_animation)
             self.emulator_echoing = False
             
             # Interpolate emulator button for more finely spaced grid search
             interpolate_axis = self.fig.add_axes([0.25, 0.025, 0.12, 0.04])
-            self.interpolate = Button(interpolate_axis, 'TODO: Interpolate Emulator?')
+            self.interpolate = Button(interpolate_axis, 'Interpolate Emulator')
             self.interpolate.on_clicked(self.interpolate_emulator)
+            # Switch to load and activate the interpolate button
+            self.interpolate_emu_loaded = False
+            self.interpolate_emu_active = False
         
         # ---------------------------------------------------------------------|
         # Button (mouse) press event pauses animation on mouse click.
@@ -502,7 +546,7 @@ class InspectGrid:
         
         self.animation.running = True # Start animation
         
-        plt.show() 
+        plt.show()
 
 
     def slider_updating_spectrum(self, extra):
@@ -515,35 +559,59 @@ class InspectGrid:
         self.ax.set_xlabel("Wavelength ($\AA$)")
         self.ax.set_ylabel("Flux")
         self.ax.set_xlim(min(self.grid.wl), max(self.grid.wl))
-        self.ax.set_ylim(self.axis_min_flux*0.9, self.axis_max_flux*1.1)
-        #self.ax.set_ylim(0,3.4) 
         self.ax.set_title(f"Spectral Data Exploration Tool")
-        # Clean legend labels, 3 sig fig with 3 trailing decimal places     
+        # Clean legend labels, 3 sig fig with 3 trailing decimal places
         glabel = ['{:.3f}'.format(np.round(i,3)) for i in self.unique_combinations[self.grid_slider.val]]
+        # Plotting fluxes if dimensionless data or not
+        if self.dimensionless_data:
+            plotting_flux = self.dimensionless_grid_fluxes
+            self.ax.set_ylim(self.dimensionless_axis_min_flux*1.1,self.dimensionless_axis_max_flux*1.1)
+        else:
+            plotting_flux = self.entire_grid_fluxes
+            self.ax.set_ylim(self.axis_min_flux*0.9, self.axis_max_flux*1.1) 
         self.ax.plot(self.grid.wl,
-                     self.entire_grid_fluxes[self.grid_slider.val],
+                     plotting_flux[self.grid_slider.val],
                      label=f'Grid:{", ".join(glabel)}',
                      visible=self.grid_visible,
                      )
         
-
-        if self.emu != None:
+        if self.emu != None and self.interpolate_emu_active != True:
             # Clean legend labels, 3 sig fig with 3 trailing decimal places
             elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.emu.grid_points[self.emu_slider.val]]
+                    # Plotting fluxes if dimensionless data or not
+            if self.dimensionless_data:
+                plotting_flux = self.dimensionless_emu_fluxes
+            else:
+                plotting_flux = self.entire_emu_fluxes
             self.ax.plot(self.emu.wl, 
-                         self.entire_emu_fluxes[self.emu_slider.val], 
+                         plotting_flux[self.emu_slider.val], 
                          label=f'Emulator:{", ".join(elabel)}',
                          visible=self.emu_visible,
+                         )
+            
+        # if we are using the interpolated emulator
+        elif self.emu != None and self.interpolate_emu_active == True:
+            # Clean legend labels, 3 sig fig with 3 trailing decimal places
+            elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.finer_unique_combinations[self.finer_emu_slider.val]]
+            # Plotting fluxes if dimensionless data or not
+            if self.dimensionless_data:
+                plotting_flux = self.dimensionless_finer_emu_fluxes
+            else:
+                plotting_flux = self.finer_emu_fluxes
+            self.ax.plot(self.emu.wl, 
+                         plotting_flux[self.finer_emu_slider.val], 
+                         label=f'Emulator:{", ".join(elabel)}',
+                         visible=self.finer_emu_visible,
                          )
 
         # Adding the permanent plots data to a plotting axis    
         for i in self.add_grid_plots.values():
             self.ax.plot(i[0], i[1], label=i[2], visible=self.fixed_visible)
-            
+        
         if self.emu != None:
             for i in self.add_emu_plots.values():
                 self.ax.plot(i[0], i[1], label=i[2], visible=self.fixed_visible)
-                
+         
         if self.grid_echoing:
             number_of_echoes = len(self.grid_slider_list)-1 # incase small grid
             if number_of_echoes > 5:
@@ -553,7 +621,7 @@ class InspectGrid:
                 last = current - previous # previous indexes
                 plot_index = self.grid_slider_list[last] # previous slider index
                 self.ax.plot(self.grid.wl,
-                             self.entire_grid_fluxes[plot_index]*1e11,
+                             self.entire_grid_fluxes[plot_index],
                              visible=self.grid_visible,
                              alpha=1-(previous+1)/10,
                              color='#268BD2'
@@ -575,7 +643,7 @@ class InspectGrid:
                                     alpha=1-(previous+1)/10,
                                     color='#2AA198'
                                     )
-            
+        
         self.ax.legend()
         self.fig.canvas.draw_idle()
 
@@ -631,6 +699,19 @@ class InspectGrid:
                     emu_next_val = self.emu_slider_list[emu_slider_index + 1]
                 self.emu_slider.set_val(emu_next_val)
                 
+    
+    def dimensionless_data_function(self, event):
+        """This function is to transform the spectra in absolute flux to 
+        dimensionless data which has been normalised, centred and whitened. 
+        The transformation is done in preparation for the PCA process.
+        This function also readjusts the axis limits to the new data."""
+        
+        self.dimensionless_data = not self.dimensionless_data
+        self.clear_grid_spectrum(event) # clearing the potential fixed plots
+        if self.emu != None:
+            self.clear_emu_spectrum(event)  # clearing the potential fixed plots
+        self.grid_slider.set_val(self.grid_slider.val) # updating the plot
+        return self.dimensionless_data
                 
     def grid_check_box(self, event):
         """This function toggles the visibility of the grid 
@@ -655,6 +736,7 @@ class InspectGrid:
         spectra. It is called when the user clicks the check boxes."""
         
         self.emu_visible = not self.emu_visible
+        self.finer_emu_visible = not self.finer_emu_visible
         self.emu_slider.set_val(self.emu_slider.val)
         return self.emu_visible
         
@@ -668,11 +750,9 @@ class InspectGrid:
             (xm2,ym2),(xM2,yM2) = self.emu_slider.label.clipbox.get_points()
             
         if xm < event.x < xM and ym < event.y < yM: # if clicking slider, pause
-            self.animation.pause()
             self.animation.running = False
         elif self.emu != None:
             if xm2 < event.x < xM2 and ym2 < event.y < yM2:
-                self.animation.pause()
                 self.animation.running = False
     
     
@@ -768,7 +848,6 @@ class InspectGrid:
         If fixed parameter list, it moves to the next possible fixed parameter
         value."""
         
-        self.animation.pause()
         self.animation.running = False
         current = self.grid_slider_list.index(self.grid_slider.val)
         self.grid_slider.set_val(self.grid_slider_list[current-1])
@@ -779,7 +858,6 @@ class InspectGrid:
         If fixed parameter list, it moves to the next possible fixed parameter
         value."""
         
-        self.animation.pause()
         self.animation.running = False
         current = self.grid_slider_list.index(self.grid_slider.val)
         if current + 1 == len(self.grid_slider_list): # if next outside list
@@ -792,10 +870,15 @@ class InspectGrid:
         If fixed parameter list, it moves to the next possible fixed parameter
         value."""
         
-        self.animation.pause()
         self.animation.running = False
-        current = self.emu_slider_list.index(self.emu_slider.val)
-        self.emu_slider.set_val(self.emu_slider_list[current-1])
+        # for the finer interpolated emulator grid
+        if self.interpolate_emu_active == True:
+            current = self.finer_emu_slider_list.index(self.finer_emu_slider.val)
+            self.finer_emu_slider.set_val(self.finer_emu_slider_list[current-1])
+        # for the normal coarser emulator grid
+        else:
+            current = self.emu_slider_list.index(self.emu_slider.val)
+            self.emu_slider.set_val(self.emu_slider_list[current-1])
         
         
     def emu_right_arrow(self, event):
@@ -804,10 +887,18 @@ class InspectGrid:
         value."""
         
         self.animation.running = False
-        current = self.emu_slider_list.index(self.emu_slider.val)
-        if current + 1 == len(self.emu_slider_list): # if next outside list
-            current = -1 # start at beginning of list again
-        self.emu_slider.set_val(self.emu_slider_list[current+1])
+        # for the finer interpolated emulator grid
+        if self.interpolate_emu_active == True:
+            current = self.finer_emu_slider_list.index(self.finer_emu_slider.val)
+            if current + 1 == len(self.finer_emu_slider_list):
+                current = -1
+            self.finer_emu_slider.set_val(self.finer_emu_slider_list[current+1])
+        # for the normal coarser emulator grid
+        else:
+            current = self.emu_slider_list.index(self.emu_slider.val)
+            if current + 1 == len(self.emu_slider_list): # if next outside list
+                current = -1 # start at beginning of list again
+            self.emu_slider.set_val(self.emu_slider_list[current+1])
         
         
     def add_grid_spectrum(self, event):
@@ -821,10 +912,12 @@ class InspectGrid:
         # dictionary called self.add_grid_plots. This is done this way 
         # as for some reason creating a matplotlib self.ax.plot here doesn't 
         # plot when called in slider_updating_spectrum. This can likely be fixed.
-        plotting_list = [self.grid.wl, self.entire_grid_fluxes[self.grid_slider.val]*1e11, f'Grid{self.add_grid_plots_counter}:{", ".join(glabel)}', self.grid_visible]
+        if self.dimensionless_data:
+            plotting_list = [self.grid.wl, self.dimensionless_grid_fluxes[self.grid_slider.val], f'Grid{self.add_grid_plots_counter}:{", ".join(glabel)}', self.grid_visible]
+        else:
+            plotting_list = [self.grid.wl, self.entire_grid_fluxes[self.grid_slider.val], f'Grid{self.add_grid_plots_counter}:{", ".join(glabel)}', self.grid_visible]
         self.add_grid_plots[self.add_grid_plots_counter] = plotting_list
         self.grid_slider.set_val(self.grid_slider.val) # refreshing the plot
-        # TODO Normalisation constant here too. 
         
         
     def clear_grid_spectrum(self, event):
@@ -839,14 +932,32 @@ class InspectGrid:
         each animation frame until cleared."""
         
         self.add_emu_plots_counter += 1 # iterator for dictionary key
-        # Clean legend labels, 3 sig fig with 3 trailing decimal places
-        elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.emu.grid_points[self.emu_slider.val]]
-        # Warning! Adding the current plot's data to a list which is placed in a 
-        # dictionary called self.add_grid_plots. This is done this way 
-        # as for some reason creating a matplotlib self.ax.plot here doesn't 
-        # plot when called in slider_updating_spectrum. This can likely be fixed.
-        plotting_list = [self.emu.wl, self.entire_emu_fluxes[self.emu_slider.val], f'Emu{self.add_emu_plots_counter}:{", ".join(elabel)}', self.emu_visible]
-        self.add_emu_plots[self.add_emu_plots_counter] = plotting_list
+        if self.interpolate_emu_active == False:
+            # Clean legend labels, 3 sig fig with 3 trailing decimal places
+            elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.emu.grid_points[self.emu_slider.val]]
+            # Warning! Adding the current plot's data to a list which is placed in a 
+            # dictionary called self.add_grid_plots. This is done this way 
+            # as for some reason creating a matplotlib self.ax.plot here doesn't 
+            # plot when called in slider_updating_spectrum. This can likely be fixed.
+            if self.dimensionless_data:
+                plotting_list = [self.emu.wl, self.dimensionless_emu_fluxes[self.emu_slider.val], f'Emu{self.add_emu_plots_counter}:{", ".join(elabel)}', self.emu_visible]
+            else:
+                plotting_list = [self.emu.wl, self.entire_emu_fluxes[self.emu_slider.val], f'Emu{self.add_emu_plots_counter}:{", ".join(elabel)}', self.emu_visible]
+            self.add_emu_plots[self.add_emu_plots_counter] = plotting_list
+            
+        elif self.interpolate_emu_active == True:
+            # Clean legend labels, 3 sig fig with 3 trailing decimal places
+            elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.finer_unique_combinations[self.finer_emu_slider.val]]
+            # Warning! Adding the current plot's data to a list which is placed in a 
+            # dictionary called self.add_grid_plots. This is done this way 
+            # as for some reason creating a matplotlib self.ax.plot here doesn't 
+            # plot when called in slider_updating_spectrum. This can likely be fixed.
+            if self.dimensionless_data:
+                plotting_list = [self.emu.wl, self.dimensionless_finer_emu_fluxes[self.finer_emu_slider.val], f'Emu{self.add_emu_plots_counter}:{", ".join(elabel)}', self.emu_visible]
+            else:
+                plotting_list = [self.emu.wl, self.finer_emu_fluxes[self.finer_emu_slider.val], f'Emu{self.add_emu_plots_counter}:{", ".join(elabel)}', self.emu_visible]
+            self.add_emu_plots[self.add_emu_plots_counter] = plotting_list
+            
         self.emu_slider.set_val(self.emu_slider.val) # refreshing the plot
     
     
@@ -871,15 +982,97 @@ class InspectGrid:
     
     
     def interpolate_emulator(self, event):
-        pass
-    
+        """This function interpolates the emulator points' fluxes to a finer 
+        grid. Upon first press, the new finer grid is created by loading the
+        flux. After this the interpolator can be switched on and off."""
+        
+        if self.interpolate_emu_loaded == False: # First press, load new grid
+            # Creating new emulator combinations inbetween the grid points
+            limiting_number = 3000 # +1 iteration maximum number of combinations
+            unique_number = 0 # number of unique combinations initialisation
+            intervals = 0 # number for the linspace function
+            while unique_number < limiting_number:
+                unique_interpolations = [] # new grid of unique combinations
+                intervals += 1 # increasing the number of intervals
+                for parameter_values in self.grid.points: # for each parameter
+                    interpolated_parameter = [] # new parameter list
+                    for value_index in range(len(parameter_values)-1):
+                        linspaced = np.linspace(parameter_values[value_index],
+                                                parameter_values[value_index+1],
+                                                intervals, 
+                                                endpoint=False
+                                                ) # points between two grid values
+                        interpolated_parameter.extend(linspaced) # adding to new list
+                    # As endpoint=False, the last parameter values is not included,
+                    # so we add the final grid value to the list separately.
+                    interpolated_parameter.append(parameter_values[-1])
+                    # Add new parameter values to grid list
+                    unique_interpolations.append(interpolated_parameter)
+                # list to array
+                unique_interpolations = np.array(unique_interpolations)
+            
+                # All finer unique combinations in a 1D list
+                self.finer_unique_combinations = []
+                for combination in itertools.product(*unique_interpolations):
+                    self.finer_unique_combinations.append(list(combination))
+                # check if we are generating too many combinations
+                unique_number = len(self.finer_unique_combinations)
+                
+                
+            # Loading the fluxes for the new finer grid
+            self.finer_emu_fluxes = []
+            print('Generating more emulator spectra. Please Wait...')
+            for spectrum in tqdm(self.finer_unique_combinations): 
+                flux = self.emu.load_flux(spectrum, norm=True)
+                self.finer_emu_fluxes.append(flux)
+            
+            # Producing a dimensionless data set for the finer emulator space
+            # Note: the spectrum of idential parameters will not be the same 
+            # between the fine grid and coarse grid as it is resampling the 
+            # random normal multivariate distribution for the weights
+            self.dimensionless_finer_emu_fluxes = np.array(self.finer_emu_fluxes)
+            for index, params in enumerate(self.finer_unique_combinations):
+                self.dimensionless_finer_emu_fluxes[index] /= self.emu.norm_factor(params)
+            #flux_mean = self.dimensionless_finer_emu_fluxes.mean(0)
+                self.dimensionless_finer_emu_fluxes[index] -= self.emu.flux_mean
+            #flux_std = self.dimensionless_finer_emu_fluxes.std(0)
+                self.dimensionless_finer_emu_fluxes[index] /= self.emu.flux_std
+
+            self.finer_emu_slider_list = [i for i in range(len(self.finer_unique_combinations))] # list of indexes for slider
+            # New emulator slider for the new finer grid
+            self.finer_emu_visible = True # Slider visibility
+            self.finer_emu_axis = self.fig.add_axes([0.25, 0.1, 0.55, 0.03])
+            self.finer_emu_slider = Slider(self.finer_emu_axis,
+                                    'Finer Emulator',
+                                    0,
+                                    max(self.finer_emu_slider_list),
+                                    valinit=0,
+                                    valstep=self.finer_emu_slider_list,
+                                    initcolor='none',
+                                    handle_style={'facecolor':'black'},
+                                    color='#2AA198',
+                                    track_color='#c42d2a')
+            self.finer_emu_slider.on_changed(self.slider_updating_spectrum)
+            # Initialisation of slider to invisible as reversed in next few lines
+            self.finer_emu_axis.set_visible(not self.finer_emu_axis.get_visible())
+            self.interpolate_emu_loaded = True # Switching to loaded state
+        
+        
+        # Change switch when clicked to on/off
+        self.interpolate_emu_active = not self.interpolate_emu_active
+        # Switching visibility of the coarser emulator grid 
+        self.emu_axis.set_visible(not self.emu_axis.get_visible())
+        # Switching visibility of finer emulator grid, opposite to course
+        self.finer_emu_axis.set_visible(not self.finer_emu_axis.get_visible())
+        self.animation.running = False # Pausing the animations
+        # Hiding echo button not to be used by the user in this mode.
+        self.echo_e_axis.set_visible(not self.echo_e_axis.get_visible())
+        self.emu_slider.set_val(self.emu_slider.val) # refreshing the plot
     
     def toggle_animation(self, event):
         """Button press pauses and unpauses the animation."""
         
         if self.animation.running:
-            self.animation.pause()
             self.animation.running = False
         else:
-            self.animation.resume()
             self.animation.running = True
