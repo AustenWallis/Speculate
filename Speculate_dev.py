@@ -1,5 +1,5 @@
 # %% Stage 1) Imports and Speculate Grid Classes/funcitons for 'python'.
-# =============================================================================|
+# 1) ==========================================================================|
 
 import autopep8
 import os
@@ -28,7 +28,7 @@ from Speculate_addons.Spec_gridinterfaces import KWDGridInterface
 from Speculate_addons.Spec_gridinterfaces import ShortSpecGridInterface
 
 # %% Stage 2.1) Flux grid space (HDF5) setup and PCA inputs
-# =============================================================================|
+# 2.1) ========================================================================|
 
 """ 
 -------------------------------------------------------------------------------|
@@ -58,7 +58,7 @@ grid_file_name = 'Grid_full'  # Builds fast, file save unnessary.
 kgrid = 0                     # Turn on if planning to use kgrid
 shortspec = 1                 # Turn on if planning to use shortspec_cv_grid
 
-n_components = 5              # Alter the number of PCA components used.
+n_components = 6              # Alter the number of PCA components used.
 # Integer for no. of components or decimal (0.0-1.0) for 0%-100% accuracy.
 # -----------------------------------------------------------------------------|
 
@@ -69,26 +69,30 @@ model_parameters_str = ''.join(str(i) for i in model_parameters)
 
 # Selecting the specified grid interface 
 if kgrid == 1:
-    grid = KWDGridInterface(
-        path='kgrid/sscyg_kgrid090311.210901/',
-        wl_range=wl_range,
-        model_parameters=model_parameters)
     # Change inclination with usecols[1]
     usecols = (1, 8) # Wavelength, Inclination 8-14 --> 40-70 degrees
     skiprows = 2  # Start of data within file
+    grid = KWDGridInterface(
+        path='kgrid/sscyg_kgrid090311.210901/',
+        usecols=usecols,
+        skiprows=skiprows,
+        wl_range=wl_range,
+        model_parameters=model_parameters)
     inclination = usecols[1] * 5
     emu_file_name = f'Kgrid_emu_{scale}_{usecols[1]*5}inc_{wl_range[0]}-{wl_range[1]}AA_{n_components}comp_{model_parameters_str}'
 
 if shortspec == 1:
+    # Change inclination with usecols[1]
+    usecols = (1, 21) # Wavelength, Inclination 10-21 --> 30-85 degrees
+    skiprows = 81  # Starting point of data within file
     grid = ShortSpecGridInterface(
         path='short_spec_cv_grid/',
+        usecols=usecols,
+        skiprows=skiprows,
         wl_range=wl_range,
         model_parameters=model_parameters, 
         scale=scale
         )
-    # Change inclination with usecols[1]
-    usecols = (1, 16) # Wavelength, Inclination 10-21 --> 30-85 degrees
-    skiprows = 81  # Starting point of data within file
     inclination = (usecols[1]-4) * 5
     emu_file_name = f'SSpec_emu_{scale}_{(usecols[1]-4) * 5}inc_{wl_range[0]}-{wl_range[1]}AA_{n_components}comp_{model_parameters_str}'
     
@@ -119,7 +123,7 @@ else:
     print('Create new emulator in Stage 3.')
 
 # %% Stage 2.2) Speculate's spectral data exploration tool (SDET).
-# =============================================================================|
+# 2.2) ========================================================================|
 # The Class should open a new window to allow the user to explore the grid.
 
 %matplotlib qt
@@ -127,7 +131,7 @@ plt.style.use('Solarize_Light2') # Plot Style (⌐▀͡ ̯ʖ▀) (ran twice as b
 grid_viewer = spec.InspectGrid(grid, emu) # Emu (Emulator) optional
 
 # %% Stage 3) Generating and training a new emulator
-# =============================================================================|
+# 3) ==========================================================================|
 
 # Asking if user wants to continue training a new emulator
 if emu_exists == 1:
@@ -151,22 +155,19 @@ if emu_exists == 0:
     print(emu)  # Displays the trained emulator's parameters
 
 # %% Stage 3 not converged?: Continue training emulator
-# =============================================================================|
+# 3.) =========================================================================|
 
 emu.train(method="Nelder-Mead", options=dict(maxiter=1e5, disp=True))
 emu.save(f'Grid-Emulator_Files/{emu_file_name}.hdf5')  # Saving the emulator
 print(emu)
 
 # %% Stage 4) Plotting the emulator's eigenspectra and weights slice TODO
-# =============================================================================|
+# 4) ==========================================================================|
 
+%matplotlib inline
 # Inputs: Displayed parameter (1-X), other parameters' fixed index (0-(X-1))
 spec.plot_emulator(emu, grid, 1, 0)
 # plot_new_eigenspectra(emu, 51)  # <---- Yet to implement
-# %%
-
-# Normalisation Debugging =====================================================|
-
 
 # =============================================================================|
 
@@ -216,7 +217,7 @@ def plot_new_eigenspectra(emulator, params, filename=None):
 
     plt.show()
 # %% # Stage 5) Plotting the emulator's covariance matrix
-# =============================================================================|
+# 5) ==========================================================================|
 
 emu = Emulator.load(f"Grid-Emulator_Files/{emu_file_name}.hdf5")
 random_grid_point = random.choice(emu.grid_points)
@@ -236,7 +237,7 @@ plt.plot(emu.wl, flux)
 
 
 # %% # Stage 6) Adding observational spectrum as data
-# =============================================================================|
+# 6) ==========================================================================|
 %matplotlib inline
 
 # ---------- Switches here -----------|
@@ -305,7 +306,7 @@ print(file)
 
 
 # %% Stage 7) Measuring the autocorrelation of pixels.
-# =============================================================================|
+# 7) ==========================================================================|
 
 # ----- Inputs here ------|
 # Value of sigma (standard deviation) for the size of filter's gaussian
@@ -443,7 +444,7 @@ plt.legend()
 plt.show()
 
 # %% Stage 8.1) Kernel Calculators"""
-# =============================================================================|
+# 8.1) ========================================================================|
 
 # TODO: Implement kernel calculators for the emulator's global matrix
 
@@ -453,7 +454,7 @@ plt.show()
 spec.search_grid_points(1, emu, grid) # <-- 1/0 switch for on/off
 
 # %% Stage 9) Assigning the model and initial model plot"""
-# =============================================================================|
+# 9) ==========================================================================|
 
 # ----- Inputs here ------|
 # Natural logarithm of the global covariance's Matern 3/2 kernel amplitude
@@ -468,7 +469,6 @@ model = SpectrumModel(
     data,
     # [list, of , grid , points]emu.grid_points[119] [-8.95, 10.26, 1.82]
     grid_params=list(emu.grid_points[59]),
-    norm=False,
     Av=0,
     global_cov=dict(log_amp=log_amp, log_ls=log_ls)
 )
@@ -489,7 +489,7 @@ print("-- Model Labels --")
 print(model.labels)
 
 # %% Stage 10) Assigning the mcmc priors
-# =============================================================================|
+# 10) =========================================================================|
 
 # Default_priors contains a distribution for every possible parameter
 # Mostly uniform across grid space bar global_cov being normal
@@ -523,7 +523,7 @@ for label in model.labels:
     priors[label] = default_priors[label]  # if label in default_priors:
 
 # %% Stage 11) Training model with scipy.optimise.minimize(nelder-mead method)
-# =============================================================================|
+# 11) =========================================================================|
 
 # TODO: SIMPLEX - Need to add global covariance hyperparameters
 initial_simplex = spec.simplex(model, priors) 
@@ -537,26 +537,26 @@ model.train(
 print(model)
 
 # %% Stage 11.continued) Continue training the model
-# =============================================================================|
+# 12) =========================================================================|
 
 model.train(priors, options=dict(maxiter=1e5, disp=True))
 print(model)
 
 # %% Stage 12.1) Saving and plotting the trained model
-# =============================================================================|
+# 12.1) =======================================================================|
 
 model.plot(yscale="linear")
 model.save("Grid-Emulator_Files/Grid_full_MAP.toml")
 
 # %% Stage 12.2) Reloading the trained model
-# =============================================================================|
+# 12.2) =======================================================================|
 
 model.load("Grid-Emulator_Files/Grid_full_MAP.toml")
 model.freeze("global_cov")
 print(model.labels)
 
 # %% Stage 13) Set walkers initial positions/dimensionality and mcmc parameters
-# =============================================================================|
+# 13) =========================================================================|
 
 os.environ["OMP_NUM_THREADS"] = "1"
 mp.set_start_method('fork', force=True)
@@ -590,7 +590,7 @@ for i, key in enumerate(model.labels):
     ball[:, i] += model[key]
 
 # %% Stage 14) Running MCMC, maximizing and setting up our backend/sampler
-# =============================================================================|
+# 14) =========================================================================|
 
 def log_prob(P, priors):
     model.set_param_vector(P)
@@ -636,7 +636,7 @@ with Pool(ncpu) as pool:
     sampler.run_mcmc(backend.get_last_sample(), extra_steps, progress=True)
 
 # %% Stage 15) Plotting raw MCMC chains
-# =============================================================================|
+# 15) =========================================================================|
 
 reader = emcee.backends.HDFBackend(
     "Grid-Emulator_Files/Grid_full_MCMC_chain.hdf5")
@@ -645,7 +645,7 @@ flatchain = reader.get_chain(flat=True)
 az.plot_trace(full_data)
 
 # %% Stage 16) Discarding MCMC burn-in
-# =============================================================================|
+# 16) =========================================================================|
 
 tau = reader.get_autocorr_time(tol=0)
 if m.isnan(tau.max()):
@@ -662,7 +662,7 @@ dd = dict(zip(model.labels, burn_samples.T))
 burn_data = az.from_dict(dd)
 
 # %% Stage 17) Chain trace and summary
-# =============================================================================|
+# 17) =========================================================================|
 
 # Plotting the mcmc chains without the burn-in section,
 # summarise our mcmc run's parameters and analysis,
@@ -673,7 +673,7 @@ az.summary(burn_data, round_to=None)
 az.plot_posterior(burn_data, [i for i in model.labels])
 
 # %% Stage 18) Cornerplot of our parameters. 
-# =============================================================================|
+# 18) =========================================================================|
 
 # See https://corner.readthedocs.io/en/latest/pages/sigmas/
 sigmas = ((1 - np.exp(-0.5)), (1 - np.exp(-2)))
@@ -686,7 +686,7 @@ corner.corner(
 )
 
 # %% Stage 19) Plotting Best Fit MCMC parameters
-#==============================================================================|
+# 19) =========================================================================|
 
 # We examine our best fit parameters from the mcmc chains, plot and save our
 # final best fit model spectrum.
@@ -697,3 +697,58 @@ print(model)
 model.plot(yscale="linear")
 model.save("Grid-Emulator_Files/Grid_full_parameters_sampled.toml")
 
+
+# %% Processing-time data sets
+
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Plotting the training time of the emulator CIV
+# Datasets
+number_of_pca_components = [2, 3, 4, 5, 6, 7, 8, 9, 10] # x-axis
+first_train_time_train = [0.7, 2.8, 11.1, 19.2, 46.1, 118.4, 186.9, 249, 335.3] # y1-axis
+second_train_time_train = [0.5, 1.7, 6.4, 19.7, 58.5, 92.4, 154.5, 203.5, 288.3] # y2-axis
+
+number2_of_pca_components = [11, 12, 13, 14, 15] # x-axis
+first_train_time_test = [545.5, 966.8, 1178.9, 991.9, 983.3] # y1-axis
+second_train_time_test = [490.2, 650.5, 900.0, 825.6, 1063.6] # y2-axis
+
+model_linear = LinearRegression(fit_intercept=True)
+model_linear.fit(np.array(number_of_pca_components).reshape(-1, 1), np.array(first_train_time_train).reshape(-1, 1))
+time_prediction_linear = model_linear.predict(np.array([11,12,13,14,15]).reshape(-1, 1))
+print(model_linear.coef_, 'coefficients')
+print(time_prediction_linear, 'prediction')
+print(mean_squared_error(first_train_time_test, time_prediction_linear, squared=False), 'MSE')
+print(model_linear.score(np.array(number_of_pca_components).reshape(-1, 1), np.array(first_train_time_train).reshape(-1, 1)), 'R^2')
+
+#Linear Regression model to predict the training time for larger PCA components
+model = Pipeline([('poly', PolynomialFeatures(degree=2)), ('linear', LinearRegression(fit_intercept=True))])
+model.fit(np.array(number_of_pca_components).reshape(-1, 1), np.array(first_train_time_train).reshape(-1, 1))
+time_prediction = model.predict(np.array([11,12,13,14,15]).reshape(-1, 1))
+print(model.named_steps['linear'].coef_)
+print(time_prediction)
+print(mean_squared_error(first_train_time_test, time_prediction, squared=False), 'MSE')
+
+model2 = Pipeline([('poly', PolynomialFeatures(degree=2)), ('linear', LinearRegression(fit_intercept=True))])
+model2.fit(np.array(number_of_pca_components).reshape(-1, 1), np.array(second_train_time_train).reshape(-1, 1))
+time_prediction2 = model2.predict(np.array([11,12,13,14,15]).reshape(-1, 1))
+print(model2.named_steps['linear'].coef_)
+print(time_prediction2)
+print(mean_squared_error(second_train_time_test, time_prediction2, squared=False), 'MSE')
+
+# Displaying the plots
+plt.plot(number_of_pca_components, first_train_time_train, label='First Training', color='red')
+plt.plot(number_of_pca_components, second_train_time_train, label='Second Training', color='blue')
+plt.plot(number2_of_pca_components, time_prediction_linear, label='Prediction Linear')
+plt.plot(number2_of_pca_components, time_prediction, label='Prediction')
+plt.plot(number2_of_pca_components, time_prediction2, label='Prediction 2')
+plt.plot(number2_of_pca_components, first_train_time_test, label='First Testing', color='red')
+plt.plot(number2_of_pca_components, second_train_time_test, label='Second Testing', color='blue')
+plt.xlabel('Number of PCA Components')
+plt.ylabel('Training Time (s)')
+plt.title('Training Time of the Emulator')
+plt.legend()
+plt.show()
+# %%

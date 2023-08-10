@@ -26,7 +26,7 @@ class KWDGridInterface(GridInterface):
     
     """
     
-    def __init__(self, path, air=False, wl_range=(1200,1800), model_parameters=(1,2,3), scaled='linear'):
+    def __init__(self, path, usecols, skiprows, air=False, wl_range=(1200,1800), model_parameters=(1,2,3), scale='linear'):
         """
         Initialises an empty grid with parameters and wavelengths.
         
@@ -46,6 +46,9 @@ class KWDGridInterface(GridInterface):
         # param_points_1-6 correspond to the model parameters defined at the top in the respective order.
         
         self.model_parameters = model_parameters
+        self.scale = scale # Flux space scale 
+        self.usecols = usecols # Wavelength and inclination tuple
+        self.skiprows = skiprows # Starting point of fluxes in the datafile.
         points = []
         if 1 in model_parameters:
             param_points_1 = np.array([1e-10, 1.5e-10, 2.1e-10, 3.1e-10, 4.5e-10, 6.6e-10, 9.7e-10, 1.4e-09, 2.1e-09, 3e-09])
@@ -83,7 +86,7 @@ class KWDGridInterface(GridInterface):
         # The wavelengths for which the fluxes are measured are retrieved.
         try:
             wls_fname = os.path.join(self.path, 'sscyg_k2_000000000000.spec')
-            wls = np.loadtxt(wls_fname, delimiter=' ', usecols=(1), skiprows=2)
+            wls = np.loadtxt(wls_fname, delimiter=' ', usecols=self.usecols[0], skiprows=self.skiprows)
             wls = np.flip(wls)
         except:
             raise ValueError("Wavelength file improperly specified")
@@ -152,7 +155,7 @@ class KWDGridInterface(GridInterface):
             parameters_used["param{}".format(i)] = dictionary[i]
         return parameters_used
         
-    def load_flux(self, parameters, header=False, norm=False, angle_inc=0, scale='linear'):
+    def load_flux(self, parameters, header=False, norm=False):
         """
         Returns the Flux of a given set of parameters.
         
@@ -162,7 +165,7 @@ class KWDGridInterface(GridInterface):
             Contains parameters of a required grid point
             
         header : bool
-            Whether to attach param values on return
+            Whether to attach param values on return. Unimplemented!!
             
         norm : bool
             Whether to normalise the return flux (left unimplemented)
@@ -185,15 +188,16 @@ class KWDGridInterface(GridInterface):
         
         """
         from scipy.ndimage import gaussian_filter1d # Instead of normalising, a 1d gaussian smoothing filter is applied 
-        flux = np.loadtxt(self.get_flux(parameters), usecols=(8+angle_inc), skiprows=2)
+        flux = np.loadtxt(self.get_flux(parameters), usecols=self.usecols, skiprows=self.skiprows)
         flux = np.flip(flux)
         #flux = gaussian_filter1d(flux, 50)
-        if scale == 'log':
+        if self.scale == 'log':
             flux = np.log10(flux) # logged 10 
-        if scale == 'scaled': # to values near order of magnitude 10^0. 
+        if self.scale == 'scaled': # to values near order of magnitude 10^0. 
             flux = flux/np.mean(flux)
         
-        hdr = {'c0' : angle_inc} # Header constructed (channel 0 corresponds to angle of inclination)
+        # TODO: Implement header if doing to use
+        hdr = {'c0' : self.usecols[1]} # Header constructed (channel 0 corresponds to angle of inclination)
         for i in range(len(self.param_names)):
             hdr[self.param_names[i]] = parameters[i]
 
@@ -220,7 +224,7 @@ class ShortSpecGridInterface(GridInterface):
     
     """
     
-    def __init__(self, path, air=False, wl_range=(850,1850), model_parameters=(1,2,3), scale='linear'):
+    def __init__(self, path, usecols, skiprows, air=False, wl_range=(850,1850), model_parameters=(1,2,3), scale='linear'):
         """
         Initialises an empty grid with parameters and wavelengths.
         
@@ -240,7 +244,9 @@ class ShortSpecGridInterface(GridInterface):
         # The grid points in the parameter space are defined, 
         # param_points_1-3 correspond to the model parameters defined at the top in the respective order.
         self.model_parameters = model_parameters
-        self.scale = scale
+        self.scale = scale # Flux space scale 
+        self.usecols = usecols # Wavelength and inclination tuple
+        self.skiprows = skiprows # Starting point of fluxes in the datafile.
         points = []
         if 1 in model_parameters: # wind.mdot (msol/yr)
             param_points_1 = np.array([4.e-11, 1.e-10, 4.e-10, 1.e-09, 3.e-09])
@@ -275,7 +281,7 @@ class ShortSpecGridInterface(GridInterface):
         # The wavelengths for which the fluxes are measured are retrieved.
         try:
             wls_fname = os.path.join(self.path, 'run01_WMdot4e-11_d2_vinf1.spec')
-            wls = np.loadtxt(wls_fname, usecols=(1), skiprows=81, unpack=True)
+            wls = np.loadtxt(wls_fname, usecols=self.usecols[0], skiprows=self.skiprows, unpack=True)
             wls = np.flip(wls)
         except:
             raise ValueError("Wavelength file improperly specified")
@@ -337,14 +343,14 @@ class ShortSpecGridInterface(GridInterface):
             parameters_used["param{}".format(i)] = dictionary[i]
         return parameters_used
         
-    def load_flux(self, parameters, header=False, norm=False, angle_inc=6):
+    def load_flux(self, parameters, header=False, norm=False):
         """
         Returns the Flux of a given set of parameters.
         
         Args:
             parameters (ndarray): Contains parameters of a required grid point
             
-            header (bool): Whether to attach param values on return
+            header (bool): Whether to attach param values on return, unimplemented!!
             
             norm (bool): Whether to normalise the return flux (left unimplemented)
             
@@ -361,7 +367,7 @@ class ShortSpecGridInterface(GridInterface):
         """
         
         from scipy.ndimage import gaussian_filter1d # Instead of normalising, a 1d gaussian smoothing filter is applied 
-        flux = np.loadtxt(self.get_flux(parameters), usecols=(10+angle_inc), skiprows=81)
+        flux = np.loadtxt(self.get_flux(parameters), usecols=self.usecols[1], skiprows=self.skiprows)
         flux = np.flip(flux)
         #flux = gaussian_filter1d(flux, 50)
         if self.scale == 'log':
@@ -369,7 +375,8 @@ class ShortSpecGridInterface(GridInterface):
         if self.scale == 'scaled': # to values near order of magnitude 10^0. 
             flux = flux/np.mean(flux)
         
-        hdr = {'c0' : angle_inc} # Header constructed (channel 0 corresponds to angle of inclination)
+        # TODO: Implement header if doing to use
+        hdr = {'c0' : self.usecols[1]} # Header constructed (channel 0 corresponds to angle of inclination)
         for i in range(len(self.param_names)):
             hdr[self.param_names[i]] = parameters[i]
 

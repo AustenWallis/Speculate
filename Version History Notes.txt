@@ -18,8 +18,14 @@ Update Version History for Speculate
 > Image processing edge detection for fast-moving/discontinuous line profiles?
 > Difference between 524 and 522 wavelength points for emulator and grid
 
+
 ---------------------------------------
-#### 07.08.2023 Latest Updates Pushed
+#### 10.08.2023 Latest Updates Pushed
+---------------------------------------
+> Bug Fix: Usecols is not updating the reading flux file for the grid inclination
+
+---------------------------------------
+#### 07.08.2023
 ---------------------------------------
 > Added dimensionless data plotting to the SDET to view data how the PCA process
         would see the grid. 
