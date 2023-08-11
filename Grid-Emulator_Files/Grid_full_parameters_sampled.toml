@@ -2,15 +2,15 @@ frozen = [ "Av", "global_cov", "global_cov:log_amp", "global_cov:log_ls",]
 
 [parameters]
 Av = 0
-param1 = -9.317222664179827
-param2 = 4.9388261763461525
-param3 = 2.464652913114156
+param1 = -9.017530997739849
+param2 = 8.292513325087535
+param3 = 2.3412943703963656
 
 [metadata]
 name = "SpectrumModel"
 data = "Spectrum"
-emulator = "Grid-Emulator_Files/SSpec_emu_linear_60inc_1510-1590AA_4comp_123"
+emulator = "Grid-Emulator_Files/SSpec_emu_linear_85inc_1510-1590AA_8comp_123"
 
 [parameters.global_cov]
-log_amp = -56.35215153846589
-log_ls = 2.8637792334474987
+log_amp = -54.39339069021277
+log_ls = 3.9555580053280694
