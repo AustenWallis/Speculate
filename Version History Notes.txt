@@ -23,6 +23,7 @@ Update Version History for Speculate
 #### 10.08.2023 Latest Updates Pushed
 ---------------------------------------
 > Bug Fix: Usecols is not updating the reading flux file for the grid inclination
+> Cookbook update to latest working version of python 3.11
 
 ---------------------------------------
 #### 07.08.2023

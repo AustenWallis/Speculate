@@ -14,6 +14,7 @@ import numpy as np
 import scipy.stats as st
 import Speculate_addons.Spec_functions as spec
 
+#from alive_progress import alive_it
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from tqdm import tqdm
@@ -26,6 +27,8 @@ from Starfish.spectrum import Spectrum
 from Starfish.models import SpectrumModel
 from Speculate_addons.Spec_gridinterfaces import KWDGridInterface
 from Speculate_addons.Spec_gridinterfaces import ShortSpecGridInterface
+
+plt.style.use('Solarize_Light2') # Plot Style (⌐▀͡ ̯ʖ▀) (ran twice as buggy-ish)
 
 # %% Stage 2.1) Flux grid space (HDF5) setup and PCA inputs
 # 2.1) ========================================================================|
@@ -58,7 +61,7 @@ grid_file_name = 'Grid_full'  # Builds fast, file save unnessary.
 kgrid = 0                     # Turn on if planning to use kgrid
 shortspec = 1                 # Turn on if planning to use shortspec_cv_grid
 
-n_components = 6              # Alter the number of PCA components used.
+n_components = 8              # Alter the number of PCA components used.
 # Integer for no. of components or decimal (0.0-1.0) for 0%-100% accuracy.
 # -----------------------------------------------------------------------------|
 
@@ -125,10 +128,10 @@ else:
 # %% Stage 2.2) Speculate's spectral data exploration tool (SDET).
 # 2.2) ========================================================================|
 # The Class should open a new window to allow the user to explore the grid.
-
 %matplotlib qt
-plt.style.use('Solarize_Light2') # Plot Style (⌐▀͡ ̯ʖ▀) (ran twice as buggy-ish)
 grid_viewer = spec.InspectGrid(grid, emu) # Emu (Emulator) optional
+# %%
+%matplotlib inline
 
 # %% Stage 3) Generating and training a new emulator
 # 3) ==========================================================================|
@@ -164,7 +167,7 @@ print(emu)
 # %% Stage 4) Plotting the emulator's eigenspectra and weights slice TODO
 # 4) ==========================================================================|
 
-%matplotlib inline
+#%matplotlib inline
 # Inputs: Displayed parameter (1-X), other parameters' fixed index (0-(X-1))
 spec.plot_emulator(emu, grid, 1, 0)
 # plot_new_eigenspectra(emu, 51)  # <---- Yet to implement
@@ -238,7 +241,6 @@ plt.plot(emu.wl, flux)
 
 # %% # Stage 6) Adding observational spectrum as data
 # 6) ==========================================================================|
-%matplotlib inline
 
 # ---------- Switches here -----------|
 # Four methods to select which type of testing spectrum file you want:
@@ -468,7 +470,7 @@ model = SpectrumModel(
     f'Grid-Emulator_Files/{emu_file_name}.hdf5',
     data,
     # [list, of , grid , points]emu.grid_points[119] [-8.95, 10.26, 1.82]
-    grid_params=list(emu.grid_points[59]),
+    grid_params=list(emu.grid_points[58]),
     Av=0,
     global_cov=dict(log_amp=log_amp, log_ls=log_ls)
 )
@@ -557,15 +559,15 @@ print(model.labels)
 
 # %% Stage 13) Set walkers initial positions/dimensionality and mcmc parameters
 # 13) =========================================================================|
-
-os.environ["OMP_NUM_THREADS"] = "1"
-mp.set_start_method('fork', force=True)
+#TODO : Everything onwards need to be improved
+#os.environ["OMP_NUM_THREADS"] = "1"
+#mp.set_start_method('fork', force=True)
 
 # ----- Inputs here ------|
 ncpu = cpu_count() - 2      # Pool CPU's used.
-nwalkers = 3 * ncpu         # Number of walkers in the MCMC.
+nwalkers = 5 * ncpu         # Number of walkers in the MCMC.
 # Maximum iterations of the MCMC if convergence is not reached.
-max_n = 400
+max_n = 4000
 extra_steps = int(max_n / 10)  # Extra MCMC steps
 # ------------------------|
 
@@ -601,39 +603,39 @@ backend = emcee.backends.HDFBackend(
     "Grid-Emulator_Files/Grid_full_MCMC_chain.hdf5")
 backend.reset(nwalkers, ndim)
 
-with Pool(ncpu) as pool:
-    sampler = emcee.EnsembleSampler(
-        nwalkers, ndim, log_prob, args=(priors,), backend=backend, pool=pool
-    )
+#with Pool(ncpu) as pool:
+sampler = emcee.EnsembleSampler(
+    nwalkers, ndim, log_prob, args=(priors,), backend=backend
+) #pool=pool goes here
 
-    index = 0  # Tracking how the average autocorrelation time estimate changes
-    autocorr = np.empty(max_n)
+index = 0  # Tracking how the average autocorrelation time estimate changes
+autocorr = np.empty(max_n)
 
-    old_tau = np.inf  # This will be useful to testing convergence
+old_tau = np.inf  # This will be useful to testing convergence
 
-    # Now we'll sample for up to max_n steps
-    for sample in sampler.sample(ball, iterations=max_n, progress=True):
-        # Only check convergence every 10 steps
-        if sampler.iteration % 10:
-            continue
-            # Compute the autocorrelation time so far
-            # Using tol=0 means that we'll always get an estimate even
-            # if it isn't trustworthy
-        tau = sampler.get_autocorr_time(tol=0)
-        autocorr[index] = np.mean(tau)
-        index += 1
-        # skip math if it's just going to yell at us
-        if np.isnan(tau).any() or (tau == 0).any():
-            continue
-            # Check convergence
-        converged = np.all(tau * 10 < sampler.iteration)
-        converged &= np.all(np.abs(old_tau - tau) / tau < 0.01)
-        if converged:
-            print(f"Converged at sample {sampler.iteration}")
-            break
-        old_tau = tau
+# Now we'll sample for up to max_n steps
+for sample in sampler.sample(ball, iterations=max_n, progress=True):
+    # Only check convergence every 10 steps
+    if sampler.iteration % 10:
+        continue
+        # Compute the autocorrelation time so far
+        # Using tol=0 means that we'll always get an estimate even
+        # if it isn't trustworthy
+    tau = sampler.get_autocorr_time(tol=0)
+    autocorr[index] = np.mean(tau)
+    index += 1
+    # skip math if it's just going to yell at us
+    if np.isnan(tau).any() or (tau == 0).any():
+        continue
+        # Check convergence
+    converged = np.all(tau * 10 < sampler.iteration)
+    converged &= np.all(np.abs(old_tau - tau) / tau < 0.01)
+    if converged:
+        print(f"Converged at sample {sampler.iteration}")
+        break
+    old_tau = tau
 
-    sampler.run_mcmc(backend.get_last_sample(), extra_steps, progress=True)
+sampler.run_mcmc(backend.get_last_sample(), extra_steps, progress=True)
 
 # %% Stage 15) Plotting raw MCMC chains
 # 15) =========================================================================|
@@ -642,7 +644,7 @@ reader = emcee.backends.HDFBackend(
     "Grid-Emulator_Files/Grid_full_MCMC_chain.hdf5")
 full_data = az.from_emcee(reader, var_names=model.labels)
 flatchain = reader.get_chain(flat=True)
-az.plot_trace(full_data)
+walker_plot = az.plot_trace(full_data)
 
 # %% Stage 16) Discarding MCMC burn-in
 # 16) =========================================================================|
@@ -668,22 +670,22 @@ burn_data = az.from_dict(dd)
 # summarise our mcmc run's parameters and analysis,
 # plot our posteriors of each paramater,
 # produce a corner plot of our parameters.
-az.plot_trace(burn_data)
-az.summary(burn_data, round_to=None)
-az.plot_posterior(burn_data, [i for i in model.labels])
+burnt_walker_plot = az.plot_trace(burn_data)
+print(az.summary(burn_data, round_to=None))
+burnt_posteriors = az.plot_posterior(burn_data, [i for i in model.labels])
 
 # %% Stage 18) Cornerplot of our parameters. 
 # 18) =========================================================================|
 
 # See https://corner.readthedocs.io/en/latest/pages/sigmas/
 sigmas = ((1 - np.exp(-0.5)), (1 - np.exp(-2)))
-corner.corner(
+cornerplot = corner.corner(
     burn_samples.reshape((-1, len(model.labels))),
     labels=model.labels,
-    quantiles=(0.05, 0.16, 0.84, 0.95),
-    levels=sigmas,
     show_titles=True,
+    truths=list(emu.grid_points[58])
 )
+ #   quantiles=(0.05, 0.16, 0.84, 0.95),levels=sigmas,
 
 # %% Stage 19) Plotting Best Fit MCMC parameters
 # 19) =========================================================================|
