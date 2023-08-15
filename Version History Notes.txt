@@ -14,13 +14,19 @@ Update Version History for Speculate
 > Improve the Speculate plotting:
     - A plotting function for the emulated spectrum
     - A plotting function for the grid space spectra
-> Emulation/grid point comparison between different numbers of PCA components.
 > Image processing edge detection for fast-moving/discontinuous line profiles?
 > Difference between 524 and 522 wavelength points for emulator and grid
 
+---------------------------------------
+#### 15.08.2023 Latest Updates Pushed
+---------------------------------------
+> Decomposition Methods notebook. To show the various methods' effects on 
+    spectra and the provide a playground for the different switched
+    - Original Todo:
+     Emulation/grid point comparison between different numbers of PCA components.
 
 ---------------------------------------
-#### 10.08.2023 Latest Updates Pushed
+#### 10.08.2023
 ---------------------------------------
 > Bug Fix: Usecols is not updating the reading flux file for the grid inclination
 > Cookbook update to latest working version of python 3.11
