@@ -27,6 +27,8 @@ from Starfish.spectrum import Spectrum
 from Starfish.models import SpectrumModel
 from Speculate_addons.Spec_gridinterfaces import KWDGridInterface
 from Speculate_addons.Spec_gridinterfaces import ShortSpecGridInterface
+from Speculate_addons.Spec_gridinterfaces import BroadShortSpecGridInterface
+from Speculate_addons.Spec_gridinterfaces import OpticalCVGridInterface
 
 plt.style.use('Solarize_Light2') # Plot Style (⌐▀͡ ̯ʖ▀) (ran twice as buggy-ish)
 
@@ -47,11 +49,22 @@ plt.style.use('Solarize_Light2') # Plot Style (⌐▀͡ ̯ʖ▀) (ran twice as b
 6) kn.acceleration_exponent            |
 max_wl_range = (876, 1824)             | max_wl_range = (850, 1850)
 -------------------------------------------------------------------------------|
+        Parameters of model            |            Parameters of model
+   (optical_grid_spec_files/v87b)      |     (broad_short_spec_cv_grid/v87a)
+-------------------------------------------------------------------------------|
+1) disk.mdot (msol/yr)                 | 1) wind.mdot (msol/yr)
+2) wind.mdot (disk.mdot)               | 2) KWD.d
+3) KWD.d(in_units_of_rstar)            | 3) KWD.v_infinity (in_units_of_vescape)
+4) KWD.mdot_r_exponent                 |
+5) KWD.acceleration_length(cm)         |
+6) KWD.acceleration_exponent           |
+max_wl_range = (850, 7950)             | max_wl_range = (850, 7950)
+-------------------------------------------------------------------------------|
 """
 
 # ----- Inputs here -----------------------------------------------------------|
-model_parameters = (1, 2, 3)  # Minimum 2 parameter tuple from table above
-wl_range = (1510, 1590)       # Wavelength range of your emulator grid space.
+model_parameters = (1,2,3)  # Minimum 2 parameter tuple from table above
+wl_range = (4000, 7000)       # Wavelength range of your emulator grid space.
                               # Later becomes truncated +/-10Angstom
                               
 scale = 'linear'              # Transformation scaling for flux data. 'linear'
@@ -59,9 +72,11 @@ scale = 'linear'              # Transformation scaling for flux data. 'linear'
 
 grid_file_name = 'Grid_full'  # Builds fast, file save unnessary.
 kgrid = 0                     # Turn on if planning to use kgrid
-shortspec = 1                 # Turn on if planning to use shortspec_cv_grid
+shortspec = 0                 # Turn on if planning to use shortspec_cv_grid
+broadshortspec = 0            # Turn on if planning to use broadshortspec_cv_grid
+opticalspec = 1               # Turn on if planning to use optical_grid_spec_files
 
-n_components = 8              # Alter the number of PCA components used.
+n_components = 10              # Alter the number of PCA components used.
 # Integer for no. of components or decimal (0.0-1.0) for 0%-100% accuracy.
 # -----------------------------------------------------------------------------|
 
@@ -86,7 +101,7 @@ if kgrid == 1:
 
 if shortspec == 1:
     # Change inclination with usecols[1]
-    usecols = (1, 21) # Wavelength, Inclination 10-21 --> 30-85 degrees
+    usecols = (1, 16) # Wavelength, Inclination 10-21 --> 30-85 degrees
     skiprows = 81  # Starting point of data within file
     grid = ShortSpecGridInterface(
         path='short_spec_cv_grid/',
@@ -98,6 +113,37 @@ if shortspec == 1:
         )
     inclination = (usecols[1]-4) * 5
     emu_file_name = f'SSpec_emu_{scale}_{(usecols[1]-4) * 5}inc_{wl_range[0]}-{wl_range[1]}AA_{n_components}comp_{model_parameters_str}'
+
+if broadshortspec == 1:
+    # Change inclination with usecols[1]
+    usecols = (1, 16) # Wavelength, Inclination 10-21 --> 30-85 degrees
+    skiprows = 81  # Starting point of data within file
+    grid = BroadShortSpecGridInterface(
+        path='broad_short_spec_cv_grid/',
+        usecols=usecols,
+        skiprows=skiprows,
+        wl_range=wl_range,
+        model_parameters=model_parameters, 
+        scale=scale
+        )
+    inclination = (usecols[1]-4) * 5
+    emu_file_name = f'BSSpec_emu_{scale}_{(usecols[1]-4) * 5}inc_{wl_range[0]}-{wl_range[1]}AA_{n_components}comp_{model_parameters_str}'
+    
+if opticalspec == 1:
+    # Change inclination with usecols[1]
+    usecols = (1, 16) # Wavelength, Inclination 10-21 --> 30-85 degrees
+    skiprows = 81  # Starting point of data within file
+    grid = OpticalCVGridInterface(
+        path='optical_grid_spec_files/',
+        usecols=usecols,
+        skiprows=skiprows,
+        wl_range=wl_range,
+        model_parameters=model_parameters, 
+        scale=scale
+        )
+    inclination = (usecols[1]-4) * 5
+    emu_file_name = f'OSpec_emu_{scale}_{(usecols[1]-4) * 5}inc_{wl_range[0]}-{wl_range[1]}AA_{n_components}comp_{model_parameters_str}'
+    
     
 # Faster processing with python's .spec files into a hdf5 file
 # Auto-generated keyname's required to integrate with Starfish
@@ -129,7 +175,7 @@ else:
 # 2.2) ========================================================================|
 # The Class should open a new window to allow the user to explore the grid.
 %matplotlib qt
-grid_viewer = spec.InspectGrid(grid, emu) # Emu (Emulator) optional
+grid_viewer = spec.InspectGrid(grid) # Emu (Emulator) optional
 # %%
 %matplotlib inline
 
@@ -150,8 +196,8 @@ if emu_exists == 1:
 if emu_exists == 0:
     emu = Emulator.from_grid(
         f'Grid-Emulator_Files/{grid_file_name}.hdf5',
-        n_components=n_components,
-        svd_solver="full") 
+        n_components=n_components)#,
+        # svd_solver="full") 
     # scipy.optimise.minimise routine
     emu.train(method="Nelder-Mead", options=dict(maxiter=1e5, disp=True))
     emu.save(f'Grid-Emulator_Files/{emu_file_name}.hdf5')
@@ -169,7 +215,7 @@ print(emu)
 
 #%matplotlib inline
 # Inputs: Displayed parameter (1-X), other parameters' fixed index (0-(X-1))
-spec.plot_emulator(emu, grid, 1, 0)
+spec.plot_emulator(emu, grid, 1, 1)
 # plot_new_eigenspectra(emu, 51)  # <---- Yet to implement
 
 # =============================================================================|
@@ -279,7 +325,7 @@ if data_three == 1:
 
 # Python v87a formatting. Place python file within kgrid folder/directory
 if data_four == 1:
-    file = 'run59_WMdot4e-10_d5_vinf2p5.spec' # < CHANGEABLE
+    file = 'BSSpectestrun16_WMdot6p9e-9_d10p0_vinf1p8.spec' # < CHANGEABLE
     #file = 'runtest_WMdot2e-10_d14_vinf1p5.spec'
 
     waves, fluxes = np.loadtxt(
@@ -520,6 +566,17 @@ if shortspec == 1:
         "Av": st.uniform(0.0, 1.0)
     }
 
+if broadshortspec == 1:
+    default_priors = {
+        # log10 values
+        "param1": st.uniform(np.log10(4e-11), (np.log10(2.5e-8) - np.log10(4e-11))),
+        "param2": st.uniform(2, 14),
+        "param3": st.uniform(1.0, 2.0),
+        "global_cov:log_amp": st.norm(log_amp, 1),
+        "global_cov:log_ls": st.uniform(1, 7),
+        "Av": st.uniform(0.0, 1.0)
+    }
+
 priors = {}  # Selects the priors required from the model parameters used
 for label in model.labels:
     priors[label] = default_priors[label]  # if label in default_priors:
@@ -577,6 +634,9 @@ if kgrid == 1:
     default_scales = {"param1": 1e-11, "param2": 1e-2, "param3": 1e-2,
                       "param4": 1e-2, "param5": 1e+9, "param6": 1e-2}
 if shortspec == 1:
+    default_scales = {"param1": 1e-1, "param2": 1e-1, "param3": 1e-1}
+    
+if broadshortspec == 1:
     default_scales = {"param1": 1e-1, "param2": 1e-1, "param3": 1e-1}
 
 scales = {}  # Selects the priors required from the model parameters used
@@ -683,7 +743,7 @@ cornerplot = corner.corner(
     burn_samples.reshape((-1, len(model.labels))),
     labels=model.labels,
     show_titles=True,
-    truths=list(emu.grid_points[58])
+    truths=[-8.161150909, 10, 1.8] #list(emu.grid_points[32])
 )
  #   quantiles=(0.05, 0.16, 0.84, 0.95),levels=sigmas,
 

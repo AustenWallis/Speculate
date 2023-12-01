@@ -2,5 +2,6 @@
     "editor.wordWrap": "on",
     "editor.rulers": [80
 
-    ]
+    ],
+    "jupyter.showVariableViewWhenDebugging": false
 }

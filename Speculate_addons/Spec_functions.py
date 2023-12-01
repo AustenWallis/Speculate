@@ -311,8 +311,8 @@ class InspectGrid:
         self.dimensionless_grid_fluxes -= flux_mean
         # fluxes.std(0) does the standard deviation across the columns -
         # i.e. the standard deviation of the flux at each wavelength bin.
-        flux_std = self.dimensionless_grid_fluxes.std(0)
-        self.dimensionless_grid_fluxes /= flux_std
+        # flux_std = self.dimensionless_grid_fluxes.std(0) #changed
+        # self.dimensionless_grid_fluxes /= flux_std # changed
         # Set min and max values for the y axis of the plot
         self.dimensionless_axis_min_flux = 1e50 # Initialisationa at high values
         self.dimensionless_axis_max_flux = 1e-50
@@ -347,7 +347,7 @@ class InspectGrid:
         logo_ax.imshow(logo)
         logo_ax.axis('off') # Stops a graph of the logo
         plt.style.use('Solarize_Light2') # Theme
-        
+
         # Dimensionless spectra button
         dimensionless_data_box = self.fig.add_axes([0.10, 0.9, 0.10, 0.04]) # Box shape
         self.dimensionless_data = False
@@ -398,11 +398,13 @@ class InspectGrid:
         self.fig.text(0.045, 0.26, 'Plot a\n Spectrum?', fontsize=12, ha='center')
         
         # Freezing parameters of the unique combinations with a checkbox
-        freeze_axis = self.fig.add_axes([0.01, 0.35, 0.07, 0.53]) # Checkbox shape
+        freeze_axis = self.fig.add_axes([0.01, 0.35, 0.19, 0.53]) # Checkbox shape
         self.fig.text(0.045, 0.9, 'Fix\n parameters?', fontsize=12, ha='center')
         self.parameter_labels = self.grid.parameters_description().keys()
+        self.parameter_names = self.grid.parameters_description().values()
+        
         self.parameter_checkboxes = CheckButtons(freeze_axis,
-                                                 labels=self.parameter_labels)
+                                                 labels=self.parameter_names)
         self.parameter_checkboxes.on_clicked(self.freeze_parameter_update)
         
         # Initialisation
@@ -417,7 +419,7 @@ class InspectGrid:
         # enabled for a dynamic number of parameters emulated
         for i in range(len(self.parameter_labels)):
             freeze_slider_axis.append(self.fig.add_axes(
-                [0.1, 0.735 - (0.53/(len(self.parameter_labels)+1))*i, 0.06, 0.03]))
+                [0.05, (0.84-(0.53/(len(self.parameter_labels)+1))) - (0.53/(len(self.parameter_labels)+1))*i, 0.09, 0.03]))
         
         # Setting the slider for each possible parameter to be fixed.
         for i in range(len(freeze_slider_axis)):
@@ -428,7 +430,8 @@ class InspectGrid:
                                                         valinit=self.grid.points[i][0],
                                                         valstep=self.grid.points[i],
                                                         initcolor='none',
-                                                        handle_style={'facecolor':'black'})
+                                                        handle_style={'facecolor':'black',
+                                                                      'size':7})
             self.frozen[f"param{i+1}"] = False # Start unfrozen, +1 to match params
             self.freeze_slider_history[f"param{i+1}"] = self.freeze_sliders[f"param{i+1}"].val
             self.freeze_sliders[f"param{i+1}"].on_changed(self.freeze_slider_update)
@@ -475,8 +478,8 @@ class InspectGrid:
             self.dimensionless_emu_fluxes -= flux_mean
             # fluxes.std(0) does the standard deviation across the columns -
             # i.e. the standard deviation of the flux at each wavelength bin.
-            flux_std = self.dimensionless_emu_fluxes.std(0)
-            self.dimensionless_emu_fluxes /= flux_std
+            #flux_std = self.dimensionless_emu_fluxes.std(0) # changed
+            #self.dimensionless_emu_fluxes /= flux_std # changed
             
             # Adding emulator point slider    
             self.emu_axis = self.fig.add_axes([0.25, 0.1, 0.55, 0.03])
@@ -561,7 +564,7 @@ class InspectGrid:
         self.ax.set_xlim(min(self.grid.wl), max(self.grid.wl))
         self.ax.set_title(f"Spectral Data Exploration Tool")
         # Clean legend labels, 3 sig fig with 3 trailing decimal places
-        glabel = ['{:.3f}'.format(np.round(i,3)) for i in self.unique_combinations[self.grid_slider.val]]
+        glabel = ['{:.3e}'.format(i) for i in self.unique_combinations[self.grid_slider.val]]
         # Plotting fluxes if dimensionless data or not
         if self.dimensionless_data:
             plotting_flux = self.dimensionless_grid_fluxes
@@ -577,7 +580,7 @@ class InspectGrid:
         
         if self.emu != None and self.interpolate_emu_active != True:
             # Clean legend labels, 3 sig fig with 3 trailing decimal places
-            elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.emu.grid_points[self.emu_slider.val]]
+            elabel = ['{:.3e}'.format(np.round(i,3)) for i in self.emu.grid_points[self.emu_slider.val]]
                     # Plotting fluxes if dimensionless data or not
             if self.dimensionless_data:
                 plotting_flux = self.dimensionless_emu_fluxes
@@ -592,7 +595,7 @@ class InspectGrid:
         # if we are using the interpolated emulator
         elif self.emu != None and self.interpolate_emu_active == True:
             # Clean legend labels, 3 sig fig with 3 trailing decimal places
-            elabel = ['{:.3f}'.format(np.round(i,3)) for i in self.finer_unique_combinations[self.finer_emu_slider.val]]
+            elabel = ['{:.3e}'.format(np.round(i,3)) for i in self.finer_unique_combinations[self.finer_emu_slider.val]]
             # Plotting fluxes if dimensionless data or not
             if self.dimensionless_data:
                 plotting_flux = self.dimensionless_finer_emu_fluxes
@@ -758,6 +761,12 @@ class InspectGrid:
     
     def freeze_parameter_update(self, label):
         """The function freezes the parameter checkbox selected by the user."""
+        
+        if label[:5] != 'param': # only to covert tickbox names to the dict keys
+            key_list = list(self.parameter_labels)
+            val_list = list(self.parameter_names)
+            position = val_list.index(label) # finding the position of the label
+            label = key_list[position] # finding the key of the label
         
         self.frozen[label] = not self.frozen[label] # toggle True/False from checkbox
         # if parameter frozen, we need to remove non-matching grid points.
@@ -1036,7 +1045,7 @@ class InspectGrid:
             #flux_mean = self.dimensionless_finer_emu_fluxes.mean(0)
                 self.dimensionless_finer_emu_fluxes[index] -= self.emu.flux_mean
             #flux_std = self.dimensionless_finer_emu_fluxes.std(0)
-                self.dimensionless_finer_emu_fluxes[index] /= self.emu.flux_std
+                #self.dimensionless_finer_emu_fluxes[index] /= self.emu.flux_std # changed
 
             self.finer_emu_slider_list = [i for i in range(len(self.finer_unique_combinations))] # list of indexes for slider
             # New emulator slider for the new finer grid

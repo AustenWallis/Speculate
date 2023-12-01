@@ -9,7 +9,7 @@ from nptyping import NDArray
 from scipy.interpolate import LinearNDInterpolator
 from scipy.linalg import cho_factor, cho_solve
 from scipy.optimize import minimize
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, NMF, FastICA
 
 from Starfish.grid_tools import HDF5Interface
 from Starfish.grid_tools.utils import determine_chunk_log
@@ -296,14 +296,16 @@ class Emulator:
         # Center and whiten
         flux_mean = fluxes.mean(0)
         fluxes -= flux_mean
-        flux_std = fluxes.std(0)
-        fluxes /= flux_std
+        flux_std = fluxes.std(0) 
+        fluxes /= flux_std 
 
         # Perform PCA using sklearn
-        default_pca_kwargs = dict(n_components=0.99, svd_solver="full")
+        default_pca_kwargs = dict(n_components=0.99, svd_solver="full") # PCA
+        # default_pca_kwargs = dict(n_components=10, algorithm='parallel', whiten='unit-variance') # FastICA
         default_pca_kwargs.update(pca_kwargs)
         pca = PCA(**default_pca_kwargs)
         weights = pca.fit_transform(fluxes)
+        print(weights.shape, 'weights shape')
         eigenspectra = pca.components_
 
         exp_var = pca.explained_variance_ratio_.sum()
@@ -326,6 +328,7 @@ class Emulator:
             flux_std=flux_std,
             factors=norm_factors,
         )
+        print("Completed 'from grid'")
         return emulator
 
     def __call__(
@@ -498,6 +501,7 @@ class Emulator:
 
         """
         # Define our loss function
+        print("started")
         def nll(P):
             if np.any(~np.isfinite(P)):
                 return np.inf

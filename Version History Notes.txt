@@ -2,8 +2,13 @@ Update Version History for Speculate
 ------------------------------------
 
 --------------------------------
-#### To do list (24th July 2023)
+#### To do list (1st Dec 2023)
 --------------------------------
+
+> Create a 'dropbox' space for the grids not with the repository 
+> SDET:
+    - Add a button to allow the y axis limits to float or fixed at value/max
+    - Add a 'picture' mode to save a particular plot. 
 > Update cookbook text
 > Interpolated data in stage 6 switch 3, maybe smoothen noisy data switch 2.
 > Log_amp/Log_ls global kernel calculators to estimate for stage 9.
@@ -18,7 +23,19 @@ Update Version History for Speculate
 > Difference between 524 and 522 wavelength points for emulator and grid
 
 ---------------------------------------
-#### 15.08.2023 Latest Updates Pushed
+#### 01.12.2023 Latest Updates Pushed
+---------------------------------------
+> SDET for optical grid:
+    - fixed alignment of sliders with param check boxes
+    - Changed the param1 etc names to true names.
+    - improved legend to be more versatile like other animation plotter.
+
+> Added BroadShortSpec grid 'PYTHON' models into Speculate
+> Added OpticalSpec grid 'PYTHON' models into Speculate
+> Updated parts of the cookbook text
+
+---------------------------------------
+#### 15.08.2023
 ---------------------------------------
 > Decomposition Methods notebook. To show the various methods' effects on 
     spectra and the provide a playground for the different switched
