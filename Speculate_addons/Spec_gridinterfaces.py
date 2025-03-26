@@ -77,7 +77,7 @@ class KWDGridInterface(GridInterface):
             param_names=param_names,
             points=points,
             wave_units='AA',
-            flux_units='erg/s/cm^2/cm',
+            flux_units='erg/s/cm^2/AA',
             air=air,
             wl_range=wl_range,
             path=path,
@@ -263,9 +263,9 @@ class ShortSpecGridInterface(GridInterface):
 
         # Inititalising the GridInterface with the KWD parameters.
         if self.scale == 'log':
-            flux_units = 'log(erg/s/cm^2/cm)'
+            flux_units = 'log(erg/s/cm^2/AA)'
         else:
-            flux_units = 'erg/s/cm^2/cm'
+            flux_units = 'erg/s/cm^2/AA'
             
         super().__init__(
             name='Short_spec_cv_grid',
@@ -443,9 +443,9 @@ class BroadShortSpecGridInterface(GridInterface):
 
         # Inititalising the GridInterface with the KWD parameters.
         if self.scale == 'log':
-            flux_units = 'log(erg/s/cm^2/cm)'
+            flux_units = 'log(erg/s/cm^2/AA)'
         else:
-            flux_units = 'erg/s/cm^2/cm'
+            flux_units = 'erg/s/cm^2/AA'
             
         super().__init__(
             name='Broad_short_spec_cv_grid',
@@ -648,9 +648,9 @@ class OpticalCVGridInterface(GridInterface):
 
         # Inititalising the GridInterface with the KWD parameters.
         if self.scale == 'log':
-            flux_units = 'log(erg/s/cm^2/cm)'
+            flux_units = 'log(erg/s/cm^2/AA)'
         else:
-            flux_units = 'erg/s/cm^2/cm'
+            flux_units = 'erg/s/cm^2/AA'
             
         super().__init__(
             name='Optical_cv_grid',
@@ -784,9 +784,9 @@ class OpticalCVGridInterface(GridInterface):
         
 class HalphaCVGridInterface(GridInterface):
     """
-    An Interface to the short spec grid produced by PYTHON v87b Radiative transfer simulations.
+    An Interface to the high res H_alpha line grid produced by PYTHON v87f Radiative transfer simulations. (Now, Sirocco)
     
-    The wavelengths in the spectra are in Angstrom and fluxes in erg/s/cm^2/cm
+    The wavelengths in the spectra are in Angstrom and fluxes in erg/s/cm^2/Angstrom
     
     Parameters of model
     -------------------
@@ -850,9 +850,9 @@ class HalphaCVGridInterface(GridInterface):
 
         # Inititalising the GridInterface with the KWD parameters.
         if self.scale == 'log':
-            flux_units = 'log(erg/s/cm^2/cm)'
+            flux_units = 'log(erg/s/cm^2/AA)'
         else:
-            flux_units = 'erg/s/cm^2/cm'
+            flux_units = 'erg/s/cm^2/AA'
             
         super().__init__(
             name='H_alpha_cv_grid',
@@ -983,3 +983,222 @@ class HalphaCVGridInterface(GridInterface):
             return flux[self.ind], hdr
         else:
             return flux[self.ind]
+        
+
+        
+class CVReleaseGridInterface(GridInterface):
+    """
+    An Interface to the short spec grid produced by PYTHON v87b Radiative transfer simulations.
+    
+    The wavelengths in the spectra are in Angstrom and fluxes in erg/s/cm^2/cm
+    
+    Parameters of model
+    -------------------
+    1) Disk.mdot (msol/yr)
+    2) wind.mdot (Disk.mdot)
+    3) KWD.d (in_units_of_Rstar)
+    4) KWD.mdot_r_exponent
+    5) KWD.acceleration_length (cm)
+    6) KWD.acceleration_exponent
+    7) Boundary_layer.luminosity(ergs/s),
+    8) Boundary_layer.temp(K)
+    
+    Optional parameters
+    -------------------
+    Angle of Inclination - Amend value in function 'def load_flux' default's value
+    
+    """
+        
+    def __init__(self, path, usecols, skiprows, air=False, wl_range=(800,8000), model_parameters=(1,2,3,4,5,6,7,8), scale='linear'):
+        """
+        Initialises an empty grid with parameters and wavelengths.
+        
+        Args:
+            path (str or path-like): The path of the base of the grid space library.
+            
+            air (bool, optional): Whether the wavelengths are measured in air or not.
+                Default is False. (Required due to implementation of inherited GridInterface class)
+                
+            wl_range (tuple, optional): The (min, max) of the wavelengths in AA. 
+                Default is (6385, 6735), wavelength range.
+            
+            model_parameters (tuple, optional): Specifiy the parameters 
+                you wish to fit by adding intergers to the tuple. 
+        """
+        
+        # The grid points in the parameter space are defined, 
+        # param_points_1-3 correspond to the model parameters defined at the top in the respective order.
+        self.model_parameters = model_parameters
+        self.scale = scale # Flux space scale 
+        self.usecols = usecols # Wavelength and inclination tuple
+        self.skiprows = skiprows # Starting point of fluxes in the datafile.
+        points = []
+        if 1 in model_parameters:
+            param_points_1 = np.array([3e-09, 1e-08, 3e-08])
+            points.append(param_points_1)
+        if 2 in model_parameters:
+            param_points_2 = np.array([0.03, 0.1, 0.3])
+            points.append(param_points_2)
+        if 3 in model_parameters:
+            param_points_3 = np.array([0.55, 5.5, 55.0])
+            points.append(param_points_3)
+        if 4 in model_parameters:
+            param_points_4 = np.array([0.0, 0.25, 1.0])
+            points.append(param_points_4)
+        if 5 in model_parameters:
+            param_points_5 = np.array([7.25182e+08, 7.25182e+09, 7.25182e+10])
+            points.append(param_points_5)
+        if 6 in model_parameters:
+            param_points_6 = np.array([0.5, 1.5, 4.5])
+            points.append(param_points_6)
+        if 7 in model_parameters:
+            param_points_7 = np.array([0.0, 0.3, 1.0])
+            points.append(param_points_7)
+        if 8 in model_parameters:
+            param_points_8 = np.array([0.1, 0.3, 1.0])
+            points.append(param_points_8)
+            
+        param_names = ["param{}".format(number) for number in model_parameters] # formatting the parameter names
+
+        # Inititalising the GridInterface with the KWD parameters.
+        if self.scale == 'log':
+            flux_units = 'log(erg/s/cm^2/AA)'
+        else:
+            flux_units = 'erg/s/cm^2/AA'
+            
+        super().__init__(
+            name='CV_release_grid_spec',
+            param_names=param_names,
+            points=points,
+            wave_units='AA',
+            flux_units=flux_units,
+            air=air,
+            wl_range=wl_range,
+            path=path,
+        )        
+    
+        # The wavelengths for which the fluxes are measured are retrieved.
+        try:
+            wls_fname = os.path.join(self.path, 'run0.spec')
+            wls = np.loadtxt(wls_fname, usecols=self.usecols[0], skiprows=self.skiprows, unpack=True)
+            wls = np.flip(wls)
+        except:
+            raise ValueError("Wavelength file improperly specified")
+        
+        # Truncating to the wavelength range to the provided values.
+        self.wl_full = np.array(wls, dtype=np.float64) #wls[::-1]
+        self.ind = (self.wl_full >= self.wl_range[0]) & (
+            self.wl_full <= self.wl_range[1])
+        self.wl = self.wl_full[self.ind]
+        
+        
+    def get_flux(self, params):
+        """
+        Constructs path to datafile corresponding to model parameters passed.
+        
+        Args:
+            params (ndarray): Contains the modelling parameters of a required grid point.
+            
+        Returns:
+            str: The path of the datafile corresponding to the input model parameters.
+        """
+        
+        # param_names = ["c{}".format(number) for number in parameter_numbers]
+        param1_name = np.log10([3e-9 , 1e-08, 3e-08]) # Disk.mdot
+        param2_name = [0.03, 0.1, 0.3] # wind.mdot (Disk.mdot)
+        param3_name = [0.55, 5.5, 55.0] # KWD.d
+        param4_name = [0.0, 0.25, 1.0] # KWD.mdot_r_exponent
+        param5_name = [7.25182e+08, 7.25182e+09, 7.25182e+10] # KWD.acceleration_length (cm)
+        param6_name = [0.5, 1.5, 4.5] # KWD.acceleration_exponent
+        param7_name = [0.0, 0.3, 1.0] # Boundary_layer.luminosity(ergs/s)
+        param8_name = [0.1, 0.3, 1.0] # Boundary_layer.temp(K)
+        all_names = [param1_name, param2_name, param3_name, param4_name, param5_name, param6_name, param7_name, param8_name]
+        
+        # Fixed values to select runs if 2D grid made, change index if wishing for different fixed other param
+        fixed_params = [param1_name[1], param2_name[1], param3_name[1], param4_name[1], param5_name[1], param6_name[1], param7_name[1], param8_name[1]]
+        
+        for loop in range(len(all_names)):
+            if "param{}".format(loop+1) not in self.param_names: # Checking for missing model parameter
+                params = np.insert(params, loop, fixed_params[loop]) # Adding fixed default for missing parameter
+        file_runs = os.listdir('CV_release_grid_spec/') # Finding all possible run file names
+        
+        # All the grid combinations
+        import itertools
+        unique_combinations = []
+        temp_grid = np.array([10**param1_name, param2_name, param3_name, param4_name, param5_name, param6_name, param7_name, param8_name])
+        for i in itertools.product(*temp_grid):
+            unique_combinations.append(list(i))
+
+        # Generating all possible combinations to match the correct file name
+        for i in range(len(unique_combinations)):
+            if np.all(np.round(params,decimals=10) == np.round(unique_combinations[i], decimals=10)):
+                file_name = f'run{i}.spec' # if matched, index is run number
+                break
+        
+        return self.path + file_name # returning the correct filename/path
+
+    def parameters_description(self):
+        """Provides a description of the model parameters used.
+
+        Returns:
+            dictionary: Description of the 'paramX' names
+        """
+        dictionary = {
+            1:"Disk.mdot (msol/yr)",
+            2:"Wind.mdot (Disk.mdot)",
+            3:"KWD.d (in_units_of_Rstar)",
+            4:"KWD.mdot_r_exponent",
+            5:"KWD.acceleration_length (cm)",
+            6:"KWD.acceleration_exponent",
+            7:"Boundary_layer.luminosity(ergs /s)",
+            8:"Boundary_layer.temp(K)"
+            } # Description of the paramters
+        parameters_used = {}
+        for i in self.model_parameters:
+            parameters_used["param{}".format(i)] = dictionary[i]
+        return parameters_used
+        
+    def load_flux(self, parameters, header=False, norm=False):
+        """
+        Returns the Flux of a given set of parameters.
+        
+        Args:
+            parameters (ndarray): Contains parameters of a required grid point
+            
+            header (bool): Whether to attach param values on return, unimplemented!!
+            
+            norm (bool): Whether to normalise the return flux (left unimplemented)
+            
+            angle_inc (int): Angle of inclination, takes values between 0 to 11 corresponding
+                to values between 30.0 and 85.0 with 5.0 degree increment.
+        
+            scale (str): Change this default too if changing the flux scale. 
+                Define the scale for your data and emulator grid space. 'linear', 'log' or 'scaled'
+                
+        Returns:
+            ndarray: List of fluxes in the wavelength range specified on initialisation
+            
+            dict (Optional): Dictionary of parameter names and values
+        """
+        
+        from scipy.ndimage import gaussian_filter1d # Instead of normalising, a 1d gaussian smoothing filter is applied 
+        flux = np.loadtxt(self.get_flux(parameters), usecols=self.usecols[1], skiprows=self.skiprows, unpack=True)
+        flux = np.flip(flux)
+        
+        flux = flux[:len(self.wl_full)] # THIS CUT IS NEEDED, Random parameters appear in the grid space header leading to mismatching file lengths.
+        #flux = gaussian_filter1d(flux, 50)
+        if self.scale == 'log':
+            flux = np.log10(flux) # logged 10 
+        if self.scale == 'scaled': # to values near order of magnitude 10^0. 
+            flux = flux/np.mean(flux)
+        
+        # TODO: Implement header if doing to use
+        hdr = {'c0' : self.usecols[1]} # Header constructed (channel 0 corresponds to angle of inclination)
+        for i in range(len(self.param_names)):
+            hdr[self.param_names[i]] = parameters[i]
+
+        if(header):
+            return flux[self.ind], hdr
+        else:
+            return flux[self.ind]
+

@@ -30,6 +30,7 @@ from Speculate_addons.Spec_gridinterfaces import ShortSpecGridInterface
 from Speculate_addons.Spec_gridinterfaces import BroadShortSpecGridInterface
 from Speculate_addons.Spec_gridinterfaces import OpticalCVGridInterface
 from Speculate_addons.Spec_gridinterfaces import HalphaCVGridInterface
+from Speculate_addons.Spec_gridinterfaces import CVReleaseGridInterface
 
 plt.style.use('Solarize_Light2') # Plot Style (⌐▀͡ ̯ʖ▀) (ran twice as buggy-ish)
 
@@ -62,34 +63,38 @@ max_wl_range = (876, 1824)             | max_wl_range = (850, 1850)
 max_wl_range = (850, 7950)             | max_wl_range = (850, 7950)
 -------------------------------------------------------------------------------|
         Parameters of model            |            Parameters of model
-     (Ha_grid_spec_files/v87b)         |     
+     (Ha_grid_spec_files/v87b)         |     (CV_release_grid/v87f)
 -------------------------------------------------------------------------------|
-1) disk.mdot (msol/yr)                 | 1) 
-2) wind.mdot (disk.mdot)               | 2) 
-3) KWD.d(in_units_of_rstar)            | 3) 
-4) KWD.mdot_r_exponent                 |
-5) KWD.acceleration_length(cm)         |
-6) KWD.acceleration_exponent           |
-max_wl_range = (6385, 6735)            | max_wl_range = 
+1) disk.mdot (msol/yr)                 | 1) disk.mdot (msol/yr)
+2) wind.mdot (disk.mdot)               | 2) wind.mdot (disk.mdot)
+3) KWD.d(in_units_of_rstar)            | 3) KWD.d(in_units_of_rstar)
+4) KWD.mdot_r_exponent                 | 4) KWD.mdot_r_exponent  
+5) KWD.acceleration_length(cm)         | 5) KWD.acceleration_length(cm) 
+6) KWD.acceleration_exponent           | 6) KWD.acceleration_exponent 
+max_wl_range = (6385, 6735)            | 7) Boundary_layer.luminosity(ergs/s)
+                                       | 8) Boundary_layer.temp(K)
+                                       | max_wl_range = (800,8000)
 -------------------------------------------------------------------------------|
 """
 
 # ----- Inputs here -----------------------------------------------------------|
-model_parameters = (1,2,3,4,5,6)  # Minimum 2 parameter tuple from table above
-wl_range = (6385, 6735)       # Wavelength range of your emulator grid space.
+model_parameters = (1,2,3,4,5,6,7,8)  # Minimum 2 parameter tuple from table above
+wl_range = (850,7950)       # Wavelength range of your emulator grid space.
                               # Later becomes truncated +/-10Angstom
                               
 scale = 'linear'              # Transformation scaling for flux data. 'linear'
                               # 'log' or 'scaled'. scale not implemented yet.
 
-grid_file_name = 'Grid_full'  # Builds fast, file save unnessary.
+grid_file_name = 'CV_Grid_full'  # If Builds fast, file save unnessary.
+process_grid = True           # Turn off if planning to use existing grid file.
 kgrid = 0                     # Turn on if planning to use kgrid
 shortspec = 0                 # Turn on if planning to use shortspec_cv_grid
 broadshortspec = 0            # Turn on if planning to use broadshortspec_cv_grid
 opticalspec = 0               # Turn on if planning to use optical_grid_spec_files
-h_alpha = 1                   # Turn on if planning to use Ha_grid_spec_files
+h_alpha = 0                   # Turn on if planning to use Ha_grid_spec_files
+cv_release = 1                # Turn on if planning to use CV_release_grid
 
-n_components = 10              # Alter the number of PCA components used.
+n_components = 5              # Alter the number of PCA components used.
 # Integer for no. of components or decimal (0.0-1.0) for 0%-100% accuracy.
 # -----------------------------------------------------------------------------|
 
@@ -176,18 +181,35 @@ if h_alpha == 1:
     inclination = (usecols[1]-4) * 5
     emu_file_name = f'HaSpec_emu_{scale}_{(usecols[1]-4) * 5}inc_{wl_range[0]}-{wl_range[1]}AA_{n_components}comp_{model_parameters_str}'
     
+if cv_release == 1:
+    # Change inclination with usecols[1]
+    usecols = (1, 15) # Wavelength, Inclination 10-21 --> 30-85 degrees
+    skiprows = 86  # Starting point of data within file
+    grid = CVReleaseGridInterface(
+        path='CV_release_grid_spec/',
+        usecols=usecols,
+        skiprows=skiprows,
+        wl_range=wl_range,
+        model_parameters=model_parameters, 
+        scale=scale
+        )
+    inclination = (usecols[1]-4) * 5
+    emu_file_name = f'CVRel_emu_{scale}_{(usecols[1]-4) * 5}inc_{wl_range[0]}-{wl_range[1]}AA_{n_components}comp_{model_parameters_str}'
+    print(emu_file_name)
+    
 # '/Users/austen/Library/CloudStorage/OneDrive-UniversityofSouthampton/Documents/PhD/Research Code/CV_Asymmetries_Paper_2024/Release_Ha_grid_spec_files'
 # Faster processing with python's .spec files into a hdf5 file
 # Auto-generated keyname's required to integrate with Starfish
 keyname = ["param{}{{}}".format(i) for i in model_parameters]
 keyname = ''.join(keyname)
 # Processing to HDF5 file interface
-creator = HDF5Creator(
-    grid,
-    f'Grid-Emulator_Files/{grid_file_name}.hdf5',
-    key_name=keyname,
-    wl_range=wl_range)
-creator.process_grid()
+if process_grid == True:
+    creator = HDF5Creator(
+        grid,
+        f'Grid-Emulator_Files/{grid_file_name}.hdf5',
+        key_name=keyname,
+        wl_range=wl_range)
+    creator.process_grid()
 
 # Add custom name if auto generation undesired?
 #emu_file_name = 'custom_name.hdf5' 
