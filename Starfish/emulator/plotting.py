@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
 
-plt.style.use("seaborn")
+plt.style.use("Solarize_Light2")
 
 
 def plot_reconstructed(emulator, grid, folder):

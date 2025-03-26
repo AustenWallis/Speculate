@@ -306,6 +306,7 @@ class Emulator:
         pca = PCA(**default_pca_kwargs)
         weights = pca.fit_transform(fluxes)
         print(weights.shape, 'weights shape')
+        print(pca.components_.shape, 'eigenvector shape')
         eigenspectra = pca.components_
 
         exp_var = pca.explained_variance_ratio_.sum()
@@ -501,7 +502,7 @@ class Emulator:
 
         """
         # Define our loss function
-        print("started")
+        print("Started training")
         def nll(P):
             if np.any(~np.isfinite(P)):
                 return np.inf
@@ -574,6 +575,7 @@ class Emulator:
         self.v11 = self.iPhiPhi / self.lambda_xi + batch_kernel(
             self.grid_points, self.grid_points, self.variances, self.lengthscales
         )
+
 
     def get_param_vector(self) -> NDArray[float]:
         """
